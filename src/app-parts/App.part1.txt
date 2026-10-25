@@ -1,0 +1,128 @@
+import React, { useEffect, useMemo, useState } from 'react';
+import {
+  Alert,
+  Pressable,
+  SafeAreaView,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
+import questions from './src/data';
+import { clearProgress, EMPTY_PROGRESS, loadProgress, saveProgress } from './src/storage';
+
+const SUBJECT_ORDER = [
+  '职业道德','数量分析','经济学','财务报表','公司发行人',
+  '股权投资','固定收益','衍生品','另类投资','组合管理'
+];
+
+const SUBJECT_SHORT = {
+  职业道德: 'Ethics', 数量分析: 'Quant', 经济学: 'Economics', 财务报表: 'FSA',
+  公司发行人: 'Corporate', 股权投资: 'Equity', 固定收益: 'Fixed Income',
+  衍生品: 'Derivatives', 另类投资: 'Alternatives', 组合管理: 'Portfolio'
+};
+
+const OPTION_KEYS = ['A','B','C'];
+
+function shuffle(arr) {
+  const a=[...arr];
+  for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; }
+  return a;
+}
+
+function pct(n,d){ return d ? Math.round(n/d*100) : 0; }
+
+function ProgressBar({ value=0 }) {
+  const v=Math.max(0,Math.min(100,value));
+  return <View style={styles.progressTrack}><View style={[styles.progressFill,{width:`${v}%`}]} /></View>;
+}
+
+function Pill({ children, tone='neutral' }) {
+  return <View style={[styles.pill, tone==='bad'&&styles.pillBad, tone==='good'&&styles.pillGood, tone==='warn'&&styles.pillWarn]}><Text style={styles.pillText}>{children}</Text></View>;
+}
+
+function StatBox({ label, value }) {
+  return <View style={styles.statBox}><Text style={styles.statValue}>{value}</Text><Text style={styles.statLabel}>{label}</Text></View>;
+}
+
+function BottomTabs({ current, onChange, wrongCount }) {
+  const tabs=[['home','首页'],['wrong',`错题 ${wrongCount||''}`],['stats','统计'],['settings','设置']];
+  return <View style={styles.tabs}>{tabs.map(([k,l])=><Pressable key={k} onPress={()=>onChange(k)} style={[styles.tab,current===k&&styles.tabActive]}><Text style={[styles.tabText,current===k&&styles.tabTextActive]}>{l}</Text></Pressable>)}</View>;
+}
+
+export default function App(){
+  const [progress,setProgress]=useState(EMPTY_PROGRESS);
+  const [loaded,setLoaded]=useState(false);
+  const [screen,setScreen]=useState('home');
+  const [subject,setSubject]=useState(null);
+  const [practice,setPractice]=useState(null);
+  const [index,setIndex]=useState(0);
+  const [sessionAnswers,setSessionAnswers]=useState({});
+
+  useEffect(()=>{(async()=>{setProgress(await loadProgress());setLoaded(true);})();},[]);
+  useEffect(()=>{if(loaded)saveProgress(progress).catch(()=>{});},[progress,loaded]);
+
+  const byId=useMemo(()=>Object.fromEntries(questions.map(q=>[q.id,q])),[]);
+  const subjectGroups=useMemo(()=>{
+    const out={};
+    SUBJECT_ORDER.forEach(s=>out[s]=questions.filter(q=>q.subject===s));
+    return out;
+  },[]);
+
+  const attemptedIds=Object.keys(progress.answers||{});
+  const wrongIds=Object.keys(progress.wrong||{}).filter(id=>byId[id]);
+  const scoredAnswers=attemptedIds.filter(id=>byId[id] && !byId[id].excludedFromScore);
+  const correctCount=scoredAnswers.filter(id=>progress.answers[id]?.lastCorrect).length;
+
+  function statsFor(list){
+    const ids=new Set(list.map(q=>q.id));
+    const attempted=Object.keys(progress.answers).filter(id=>ids.has(id));
+    const scored=attempted.filter(id=>!byId[id]?.excludedFromScore);
+    const correct=scored.filter(id=>progress.answers[id]?.lastCorrect).length;
+    const wrong=Object.keys(progress.wrong).filter(id=>ids.has(id)).length;
+    return {attempted:attempted.length,correct,wrong,rate:pct(correct,scored.length)};
+  }
+
+  function openMain(s){setScreen(s);setSubject(null);setPractice(null);setIndex(0);setSessionAnswers({});}
+  function openSubject(s){setSubject(s);setScreen('subject');}
+  function startPractice(ids,title,mode='normal'){
+    if(!ids.length){Alert.alert('暂无题目','当前筛选下没有可练习的题目。');return;}
+    setPractice({ids,title,mode});setIndex(0);setSessionAnswers({});setScreen('practice');
+  }
+
+  function recordAnswer(q, choice){
+    if(sessionAnswers[q.id]) return;
+    const isCorrect = choice===q.answer;
+    setSessionAnswers(v=>({...v,[q.id]:choice}));
+    setProgress(prev=>{
+      const old=prev.answers[q.id]||{attempts:0,correct:0,wrong:0};
+      const nextRec={...old,attempts:old.attempts+1,correct:old.correct+(isCorrect?1:0),wrong:old.wrong+(isCorrect?0:1),lastAnswer:choice,lastCorrect:isCorrect,lastAt:Date.now()};
+      const wrong={...prev.wrong};
+      if(!isCorrect && !q.excludedFromScore) wrong[q.id]={since:wrong[q.id]?.since||Date.now(),attempts:(wrong[q.id]?.attempts||0)+1};
+      return {...prev,answers:{...prev.answers,[q.id]:nextRec},wrong};
+    });
+  }
+
+  function markMastered(id){
+    setProgress(prev=>{const wrong={...prev.wrong};delete wrong[id];return {...prev,wrong,mastered:{...prev.mastered,[id]:Date.now()}};});
+  }
+  function toggleFavorite(id){setProgress(prev=>{const f={...prev.favorites};if(f[id])delete f[id];else f[id]=Date.now();return {...prev,favorites:f};});}
+
+  if(!loaded) return <SafeAreaView style={styles.safe}><StatusBar barStyle="dark-content"/><View style={styles.center}><Text style={styles.h2}>正在载入 1000 题…</Text></View></SafeAreaView>;
+
+  const mainTab = ['home','wrong','stats','settings'].includes(screen)?screen:'home';
+
+  return <SafeAreaView style={styles.safe}>
+    <StatusBar barStyle="dark-content" />
+    <View style={styles.app}>
+      {screen==='home' && <HomeScreen progress={progress} subjectGroups={subjectGroups} byId={byId} onSubject={openSubject} onStartWrong={()=>startPractice(wrongIds,'错题重做','wrong')} onRandom={()=>startPractice(shuffle(questions.filter(q=>!q.excludedFromScore)).slice(0,10).map(q=>q.id),'随机 10 题','random')} />}
+      {screen==='subject' && <SubjectScreen subject={subject} list={subjectGroups[subject]||[]} progress={progress} byId={byId} onBack={()=>openMain('home')} onStart={startPractice} />}
+      {screen==='practice' && <PracticeScreen practice={practice} index={index} byId={byId} progress={progress} sessionAnswers={sessionAnswers} onAnswer={recordAnswer} onNext={()=>setIndex(i=>Math.min((practice?.ids.length||1)-1,i+1))} onPrev={()=>setIndex(i=>Math.max(0,i-1))} onBack={()=>practice?.mode==='wrong'?openMain('wrong'):(subject?openSubject(subject):openMain('home'))} onMastered={markMastered} onFavorite={toggleFavorite} />}
+      {screen==='wrong' && <WrongScreen ids={wrongIds} byId={byId} onStart={()=>startPractice(wrongIds,'错题重做','wrong')} onSubject={(s)=>startPractice(wrongIds.filter(id=>byId[id]?.subject===s),`${s} · 错题重做`,'wrong')} />}
+      {screen==='stats' && <StatsScreen groups={subjectGroups} progress={progress} byId={byId} />}
+      {screen==='settings' && <SettingsScreen onReset={()=>Alert.alert('重置所有学习记录？','这会清空答题记录、错题本和收藏。',[{text:'取消',style:'cancel'},{text:'确定重置',style:'destructive',onPress:async()=>{await clearProgress();setProgress(EMPTY_PROGRESS);}}])} />}
+      {['home','wrong','stats','settings'].includes(screen) && <BottomTabs current={mainTab} onChange={openMain} wrongCount={wrongIds.length}/>}    
+    </View>
+  </SafeAreaView>;
+}

@@ -1,0 +1,10 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const dir = path.join(root, 'src', 'app-parts');
+const parts = [1,2,3,4].map(i => path.join(dir, `App.part${i}.b64`));
+for (const p of parts) if (!fs.existsSync(p)) throw new Error(`Missing app source part: ${p}`);
+const b64 = parts.map(p => fs.readFileSync(p, 'utf8').trim()).join('');
+fs.writeFileSync(path.join(root, 'App.js'), Buffer.from(b64, 'base64'));
+console.log('Prepared App.js');

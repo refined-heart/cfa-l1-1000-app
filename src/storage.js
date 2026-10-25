@@ -14,7 +14,7 @@ export async function loadProgress() {
     const raw = await Storage.getItem(KEY);
     if (!raw) return EMPTY_PROGRESS;
     return { ...EMPTY_PROGRESS, ...JSON.parse(raw) };
-  } catch {
+  } catch (e) {
     return EMPTY_PROGRESS;
   }
 }

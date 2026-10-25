@@ -1,14 +1,5 @@
-# CFA Level I 1000题 · Android App
+# CFA Level I 1000题手机 App
 
-离线内置 1000 道 CFA Level I 练习题，按 10 科和知识点章节重新分类。
+Android 优先的 React Native / Expo 离线刷题 App。内置完整 1000 题，按十科和知识树分类；答题后立即显示答案与深度解析，错题自动进入错题本并支持重做。
 
-主要功能：按科目/章节刷题、随机题、即时判题与解析、错题本、收藏、学习统计、本地保存进度。
-
-## 自动构建 APK
-
-推送到 main 后，GitHub Actions 的 **Build Android APK** 会自动生成可安装的 `CFA-L1-1000.apk`。
-
-构建前会先把 `src/data/questions.json.br` 解压为 `questions.json`，并强制校验：
-- 总题数 = 1000
-- 每题必须有题干、A/B/C、答案、科目与章节
-- 数据不完整 = 0
+推送到 `main` 后，GitHub Actions 会自动构建 Android APK。构建成功后，在 **Actions → Build Android APK → Artifacts** 下载 `CFA-L1-1000-APK`，解压得到 `CFA-L1-1000.apk`。

@@ -9,6 +9,9 @@
       "package": "com.study.cfa1000",
       "versionCode": 1
     },
+    "ios": {
+      "bundleIdentifier": "com.study.cfa1000"
+    },
     "plugins": ["expo-sqlite"]
   }
 }

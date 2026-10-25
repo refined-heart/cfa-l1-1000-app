@@ -2,5 +2,6 @@ node_modules/
 .expo/
 android/
 ios/
+App.js
 src/data/questions.json
 *.log

@@ -2,17 +2,24 @@
   "name": "cfa-l1-1000-mobile",
   "version": "1.0.0",
   "private": true,
-  "main": "index.js",
+  "main": "node_modules/expo/AppEntry.js",
   "scripts": {
+    "prepare:app": "node scripts/prepare-app.mjs",
     "prepare:data": "node scripts/prepare-data.mjs",
-    "check:data": "node scripts/check-data.mjs",
+    "prepare": "npm run prepare:app && npm run prepare:data",
+    "prestart": "npm run prepare",
     "start": "expo start",
-    "android": "expo start --android"
+    "preandroid": "npm run prepare",
+    "android": "expo start --android",
+    "preios": "npm run prepare",
+    "ios": "expo start --ios",
+    "check:data": "npm run prepare && node scripts/check-data.mjs"
   },
   "dependencies": {
     "expo": "~57.0.21",
     "expo-sqlite": "~57.0.4",
     "react": "19.2.3",
     "react-native": "0.86.0"
-  }
+  },
+  "devDependencies": {}
 }

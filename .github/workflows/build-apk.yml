@@ -1,61 +1,30 @@
 name: Build Android APK
-
 on:
   workflow_dispatch:
   push:
     branches: [ main ]
-  pull_request:
-    branches: [ main ]
-
-permissions:
-  contents: read
-
 jobs:
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: 22
-
-      - name: Setup Java
-        uses: actions/setup-java@v4
+      - uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: '17'
-
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v4
-
-      - name: Restore 1000-question dataset
-        run: npm run prepare:data
-
-      - name: Validate 1000-question dataset
-        run: npm run check:data
-
-      - name: Install dependencies
-        run: npm install --no-audit --no-fund
-
-      - name: Generate native Android project
-        run: CI=1 npx expo prebuild --platform android --clean
-
-      - name: Build installable debug APK
-        working-directory: android
+          java-version: '21'
+      - uses: android-actions/setup-android@v3
+      - run: npm install --no-audit --no-fund
+      - run: npm run check:data
+      - run: CI=1 npx expo prebuild --platform android
+      - working-directory: android
         run: ./gradlew assembleDebug --no-daemon
-
-      - name: Collect APK
-        run: |
-          mkdir -p build
-          cp android/app/build/outputs/apk/debug/app-debug.apk build/CFA-L1-1000.apk
-
-      - name: Upload APK
-        uses: actions/upload-artifact@v4
+      - run: cp android/app/build/outputs/apk/debug/app-debug.apk CFA-L1-1000.apk
+      - uses: actions/upload-artifact@v4
         with:
           name: CFA-L1-1000-APK
-          path: build/CFA-L1-1000.apk
+          path: CFA-L1-1000.apk
           retention-days: 30
