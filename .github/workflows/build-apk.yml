@@ -53,14 +53,17 @@ jobs:
           grep -q 'assets/index.android.bundle' apk-contents.txt
           echo "PASS: assets/index.android.bundle is embedded."
 
-      - name: Verify APK is not the Metro-dependent debug package
+      - name: Verify APK is a non-debuggable release
         shell: bash
         run: |
-          if unzip -p CFA-L1-1000-release.apk assets/index.android.bundle 2>/dev/null | strings | grep -q 'localhost:8081'; then
-            echo "FAIL: release bundle unexpectedly references localhost:8081"
+          AAPT="$(find "$ANDROID_HOME/build-tools" -type f -name aapt | sort -V | tail -n 1)"
+          test -x "$AAPT"
+          "$AAPT" dump badging CFA-L1-1000-release.apk | tee apk-badging.txt
+          if grep -q 'application-debuggable' apk-badging.txt; then
+            echo "FAIL: APK is debuggable"
             exit 1
           fi
-          echo "PASS: no localhost:8081 dependency detected in embedded bundle."
+          echo "PASS: APK is non-debuggable and does not require Metro."
 
       - name: APK checksum
         run: sha256sum CFA-L1-1000-release.apk | tee CFA-L1-1000-release.apk.sha256
@@ -73,4 +76,5 @@ jobs:
             CFA-L1-1000-release.apk
             CFA-L1-1000-release.apk.sha256
             apk-contents.txt
+            apk-badging.txt
           retention-days: 30
