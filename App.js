@@ -1,0 +1,257 @@
+import React, { useEffect, useMemo, useState } from 'react';
+import {
+  Alert,
+  Pressable,
+  SafeAreaView,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
+import questions from './src/data';
+import { clearProgress, EMPTY_PROGRESS, loadProgress, saveProgress } from './src/storage';
+
+const SUBJECT_ORDER = [
+  '职业道德','数量分析','经济学','财务报表','公司发行人',
+  '股权投资','固定收益','衍生品','另类投资','组合管理'
+];
+
+const SUBJECT_SHORT = {
+  职业道德: 'Ethics', 数量分析: 'Quant', 经济学: 'Economics', 财务报表: 'FSA',
+  公司发行人: 'Corporate', 股权投资: 'Equity', 固定收益: 'Fixed Income',
+  衍生品: 'Derivatives', 另类投资: 'Alternatives', 组合管理: 'Portfolio'
+};
+
+const OPTION_KEYS = ['A','B','C'];
+
+function shuffle(arr) {
+  const a=[...arr];
+  for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; }
+  return a;
+}
+
+function pct(n,d){ return d ? Math.round(n/d*100) : 0; }
+
+function ProgressBar({ value=0 }) {
+  const v=Math.max(0,Math.min(100,value));
+  return <View style={styles.progressTrack}><View style={[styles.progressFill,{width:`${v}%`}]} /></View>;
+}
+
+function Pill({ children, tone='neutral' }) {
+  return <View style={[styles.pill, tone==='bad'&&styles.pillBad, tone==='good'&&styles.pillGood, tone==='warn'&&styles.pillWarn]}><Text style={styles.pillText}>{children}</Text></View>;
+}
+
+function StatBox({ label, value }) {
+  return <View style={styles.statBox}><Text style={styles.statValue}>{value}</Text><Text style={styles.statLabel}>{label}</Text></View>;
+}
+
+function BottomTabs({ current, onChange, wrongCount }) {
+  const tabs=[['home','首页'],['wrong',`错题 ${wrongCount||''}`],['stats','统计'],['settings','设置']];
+  return <View style={styles.tabs}>{tabs.map(([k,l])=><Pressable key={k} onPress={()=>onChange(k)} style={[styles.tab,current===k&&styles.tabActive]}><Text style={[styles.tabText,current===k&&styles.tabTextActive]}>{l}</Text></Pressable>)}</View>;
+}
+
+export default function App(){
+  const [progress,setProgress]=useState(EMPTY_PROGRESS);
+  const [loaded,setLoaded]=useState(false);
+  const [screen,setScreen]=useState('home');
+  const [subject,setSubject]=useState(null);
+  const [practice,setPractice]=useState(null);
+  const [index,setIndex]=useState(0);
+  const [sessionAnswers,setSessionAnswers]=useState({});
+
+  useEffect(()=>{(async()=>{setProgress(await loadProgress());setLoaded(true);})();},[]);
+  useEffect(()=>{if(loaded)saveProgress(progress).catch(()=>{});},[progress,loaded]);
+
+  const byId=useMemo(()=>Object.fromEntries(questions.map(q=>[q.id,q])),[]);
+  const subjectGroups=useMemo(()=>{
+    const out={};
+    SUBJECT_ORDER.forEach(s=>out[s]=questions.filter(q=>q.subject===s));
+    return out;
+  },[]);
+
+  const attemptedIds=Object.keys(progress.answers||{});
+  const wrongIds=Object.keys(progress.wrong||{}).filter(id=>byId[id]);
+  const scoredAnswers=attemptedIds.filter(id=>byId[id] && !byId[id].excludedFromScore);
+  const correctCount=scoredAnswers.filter(id=>progress.answers[id]?.lastCorrect).length;
+
+  function statsFor(list){
+    const ids=new Set(list.map(q=>q.id));
+    const attempted=Object.keys(progress.answers).filter(id=>ids.has(id));
+    const scored=attempted.filter(id=>!byId[id]?.excludedFromScore);
+    const correct=scored.filter(id=>progress.answers[id]?.lastCorrect).length;
+    const wrong=Object.keys(progress.wrong).filter(id=>ids.has(id)).length;
+    return {attempted:attempted.length,correct,wrong,rate:pct(correct,scored.length)};
+  }
+
+  function openMain(s){setScreen(s);setSubject(null);setPractice(null);setIndex(0);setSessionAnswers({});}
+  function openSubject(s){setSubject(s);setScreen('subject');}
+  function startPractice(ids,title,mode='normal'){
+    if(!ids.length){Alert.alert('暂无题目','当前筛选下没有可练习的题目。');return;}
+    setPractice({ids,title,mode});setIndex(0);setSessionAnswers({});setScreen('practice');
+  }
+
+  function recordAnswer(q, choice){
+    if(sessionAnswers[q.id]) return;
+    const isCorrect = choice===q.answer;
+    setSessionAnswers(v=>({...v,[q.id]:choice}));
+    setProgress(prev=>{
+      const old=prev.answers[q.id]||{attempts:0,correct:0,wrong:0};
+      const nextRec={...old,attempts:old.attempts+1,correct:old.correct+(isCorrect?1:0),wrong:old.wrong+(isCorrect?0:1),lastAnswer:choice,lastCorrect:isCorrect,lastAt:Date.now()};
+      const wrong={...prev.wrong};
+      if(!isCorrect && !q.excludedFromScore) wrong[q.id]={since:wrong[q.id]?.since||Date.now(),attempts:(wrong[q.id]?.attempts||0)+1};
+      return {...prev,answers:{...prev.answers,[q.id]:nextRec},wrong};
+    });
+  }
+
+  function markMastered(id){
+    setProgress(prev=>{const wrong={...prev.wrong};delete wrong[id];return {...prev,wrong,mastered:{...prev.mastered,[id]:Date.now()}};});
+  }
+  function toggleFavorite(id){setProgress(prev=>{const f={...prev.favorites};if(f[id])delete f[id];else f[id]=Date.now();return {...prev,favorites:f};});}
+
+  if(!loaded) return <SafeAreaView style={styles.safe}><StatusBar barStyle="dark-content"/><View style={styles.center}><Text style={styles.h2}>正在载入 1000 题…</Text></View></SafeAreaView>;
+
+  const mainTab = ['home','wrong','stats','settings'].includes(screen)?screen:'home';
+
+  return <SafeAreaView style={styles.safe}>
+    <StatusBar barStyle="dark-content" />
+    <View style={styles.app}>
+      {screen==='home' && <HomeScreen progress={progress} subjectGroups={subjectGroups} byId={byId} onSubject={openSubject} onStartWrong={()=>startPractice(wrongIds,'错题重做','wrong')} onRandom={()=>startPractice(shuffle(questions.filter(q=>!q.excludedFromScore)).slice(0,10).map(q=>q.id),'随机 10 题','random')} />}
+      {screen==='subject' && <SubjectScreen subject={subject} list={subjectGroups[subject]||[]} progress={progress} byId={byId} onBack={()=>openMain('home')} onStart={startPractice} />}
+      {screen==='practice' && <PracticeScreen practice={practice} index={index} byId={byId} progress={progress} sessionAnswers={sessionAnswers} onAnswer={recordAnswer} onNext={()=>setIndex(i=>Math.min((practice?.ids.length||1)-1,i+1))} onPrev={()=>setIndex(i=>Math.max(0,i-1))} onBack={()=>practice?.mode==='wrong'?openMain('wrong'):(subject?openSubject(subject):openMain('home'))} onMastered={markMastered} onFavorite={toggleFavorite} />}
+      {screen==='wrong' && <WrongScreen ids={wrongIds} byId={byId} onStart={()=>startPractice(wrongIds,'错题重做','wrong')} onSubject={(s)=>startPractice(wrongIds.filter(id=>byId[id]?.subject===s),`${s} · 错题重做`,'wrong')} />}
+      {screen==='stats' && <StatsScreen groups={subjectGroups} progress={progress} byId={byId} />}
+      {screen==='settings' && <SettingsScreen onReset={()=>Alert.alert('重置所有学习记录？','这会清空答题记录、错题本和收藏。',[{text:'取消',style:'cancel'},{text:'确定重置',style:'destructive',onPress:async()=>{await clearProgress();setProgress(EMPTY_PROGRESS);}}])} />}
+      {['home','wrong','stats','settings'].includes(screen) && <BottomTabs current={mainTab} onChange={openMain} wrongCount={wrongIds.length}/>}    
+    </View>
+  </SafeAreaView>;
+}
+
+function HomeScreen({progress,subjectGroups,byId,onSubject,onStartWrong,onRandom}){
+  const attempted=Object.keys(progress.answers).length;
+  const scored=Object.keys(progress.answers).filter(id=>byId[id]&&!byId[id].excludedFromScore);
+  const correct=scored.filter(id=>progress.answers[id]?.lastCorrect).length;
+  const wrong=Object.keys(progress.wrong).length;
+  return <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
+    <Text style={styles.eyebrow}>CFA LEVEL I</Text>
+    <Text style={styles.title}>1000题 · 分类刷题</Text>
+    <Text style={styles.subtle}>按知识树练习，答完立即看解析，错题自动进入错题本。</Text>
+    <View style={styles.statsRow}><StatBox label="已做" value={`${attempted}/1000`}/><StatBox label="正确率" value={`${pct(correct,scored.length)}%`}/><StatBox label="错题" value={wrong}/></View>
+    <View style={styles.actionRow}>
+      <Pressable onPress={onStartWrong} style={[styles.primaryBtn,wrong===0&&styles.disabled]} disabled={wrong===0}><Text style={styles.primaryBtnText}>错题重做</Text></Pressable>
+      <Pressable onPress={onRandom} style={styles.secondaryBtn}><Text style={styles.secondaryBtnText}>随机10题</Text></Pressable>
+    </View>
+    <Text style={styles.h2}>按科目练习</Text>
+    {SUBJECT_ORDER.map(s=>{
+      const list=subjectGroups[s]||[]; const ids=new Set(list.map(q=>q.id));
+      const done=Object.keys(progress.answers).filter(id=>ids.has(id)).length;
+      const w=Object.keys(progress.wrong).filter(id=>ids.has(id)).length;
+      return <Pressable key={s} onPress={()=>onSubject(s)} style={styles.card}>
+        <View style={styles.cardTop}><View><Text style={styles.cardTitle}>{s}</Text><Text style={styles.cardSub}>{SUBJECT_SHORT[s]} · {list.length}题 · {new Set(list.map(q=>q.section)).size}节</Text></View><Text style={styles.chev}>›</Text></View>
+        <ProgressBar value={pct(done,list.length)}/>
+        <View style={styles.cardMeta}><Text style={styles.metaText}>已做 {done}</Text><Text style={styles.metaText}>错题 {w}</Text><Text style={styles.metaText}>{pct(done,list.length)}%</Text></View>
+      </Pressable>
+    })}
+  </ScrollView>
+}
+
+function SubjectScreen({subject,list,progress,byId,onBack,onStart}){
+  const sections=[...new Set(list.map(q=>q.section))];
+  return <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
+    <Pressable onPress={onBack}><Text style={styles.back}>‹ 返回</Text></Pressable>
+    <Text style={styles.eyebrow}>{SUBJECT_SHORT[subject]}</Text><Text style={styles.title}>{subject}</Text>
+    <Pressable style={styles.primaryWide} onPress={()=>onStart(list.map(q=>q.id),`${subject} · 全科练习`,'subject')}><Text style={styles.primaryBtnText}>全科 {list.length} 题</Text></Pressable>
+    <Text style={styles.h2}>按章节练习</Text>
+    {sections.map(sec=>{const qs=list.filter(q=>q.section===sec);const ids=new Set(qs.map(q=>q.id));const done=Object.keys(progress.answers).filter(id=>ids.has(id)).length;const wrong=Object.keys(progress.wrong).filter(id=>ids.has(id)).length;return <View key={sec} style={styles.card}>
+      <Text style={styles.sectionTitle}>{sec}</Text><Text style={styles.cardSub}>{qs.length}题 · 已做 {done} · 错题 {wrong}</Text><ProgressBar value={pct(done,qs.length)}/>
+      <Pressable style={styles.sectionBtn} onPress={()=>onStart(qs.map(q=>q.id),`${subject} · ${sec}`,'section')}><Text style={styles.sectionBtnText}>开始本节</Text></Pressable>
+    </View>})}
+  </ScrollView>
+}
+
+function PracticeScreen({practice,index,byId,progress,sessionAnswers,onAnswer,onNext,onPrev,onBack,onMastered,onFavorite}){
+  if(!practice) return null;
+  const q=byId[practice.ids[index]]; if(!q)return null;
+  const selected=sessionAnswers[q.id]; const answered=!!selected; const correct=selected===q.answer;
+  const isWrong=!!progress.wrong[q.id]; const fav=!!progress.favorites[q.id];
+  return <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
+    <View style={styles.practiceHead}><Pressable onPress={onBack}><Text style={styles.back}>‹ 返回</Text></Pressable><Text style={styles.smallMuted}>{index+1}/{practice.ids.length}</Text></View>
+    <Text style={styles.practiceTitle}>{practice.title}</Text>
+    <ProgressBar value={pct(index+1,practice.ids.length)}/>
+    <View style={styles.qMeta}><Pill>{q.subject}</Pill><Pill>{`原题 Q${q.originalNumber}`}</Pill>{q.excludedFromScore&&<Pill tone="warn">不计分</Pill>}</View>
+    <Text style={styles.qSection}>{q.section}</Text>
+    <Text style={styles.question}>{q.stem}</Text>
+    {OPTION_KEYS.map(k=>{
+      const picked=selected===k; const isAns=q.answer===k;
+      let st=[styles.option]; if(answered&&isAns)st.push(styles.optionCorrect); else if(answered&&picked&&!isAns)st.push(styles.optionWrong); else if(picked)st.push(styles.optionPicked);
+      return <Pressable key={k} disabled={answered} onPress={()=>onAnswer(q,k)} style={st}><Text style={styles.optLetter}>{k}</Text><Text style={styles.optText}>{q.options[k]}</Text></Pressable>
+    })}
+    {!answered && <Text style={styles.hint}>选中答案后立即显示解析；考点不会提前提示。</Text>}
+    {answered && <View style={styles.answerBox}>
+      <View style={styles.answerHead}><Text style={[styles.answerResult,correct?styles.goodText:styles.badText]}>{q.excludedFromScore?'题源校勘':(correct?'回答正确':'回答错误')}</Text><Text style={styles.answerKey}>正确答案 {q.answer}</Text></View>
+      {!!q.warning && <View style={styles.warning}><Text style={styles.warningText}>{q.warning}</Text></View>}
+      {!!q.point && <InfoBlock title="具体考点" text={q.point}/>}      
+      {!!q.explanation && <InfoBlock title="本题解析" text={q.explanation}/>}      
+      {!!q.principle && <InfoBlock title="底层原理" text={q.principle}/>}      
+      {!!q.related && <InfoBlock title="相关原理继续深挖" text={q.related}/>}      
+      {!!q.optionNotes && <InfoBlock title="选项辨析" text={q.optionNotes}/>}      
+      {!!q.pitfalls && <InfoBlock title="易错边界" text={q.pitfalls}/>}      
+      <View style={styles.inlineActions}>
+        <Pressable style={styles.ghostBtn} onPress={()=>onFavorite(q.id)}><Text style={styles.ghostBtnText}>{fav?'取消收藏':'收藏本题'}</Text></Pressable>
+        {isWrong&&correct&&<Pressable style={styles.masterBtn} onPress={()=>onMastered(q.id)}><Text style={styles.masterBtnText}>已掌握 · 移出错题</Text></Pressable>}
+      </View>
+    </View>}
+    <View style={styles.navRow}>
+      <Pressable disabled={index===0} onPress={onPrev} style={[styles.navBtn,index===0&&styles.disabled]}><Text style={styles.navText}>上一题</Text></Pressable>
+      <Pressable disabled={!answered||index===practice.ids.length-1} onPress={onNext} style={[styles.nextBtn,(!answered||index===practice.ids.length-1)&&styles.disabled]}><Text style={styles.primaryBtnText}>{index===practice.ids.length-1?'本组完成':'下一题'}</Text></Pressable>
+    </View>
+    {answered&&index===practice.ids.length-1&&<View style={styles.finishBox}><Text style={styles.h2}>这一组做完了</Text><Text style={styles.subtle}>错题会继续留在错题本，直到你做对后手动标记“已掌握”。</Text></View>}
+  </ScrollView>
+}
+
+function InfoBlock({title,text}){return <View style={styles.infoBlock}><Text style={styles.infoTitle}>{title}</Text><Text style={styles.infoText}>{text}</Text></View>}
+
+function WrongScreen({ids,byId,onStart,onSubject}){
+  const groups=SUBJECT_ORDER.map(s=>[s,ids.filter(id=>byId[id]?.subject===s)]).filter(([,a])=>a.length);
+  return <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
+    <Text style={styles.eyebrow}>REVIEW</Text><Text style={styles.title}>错题本</Text><Text style={styles.subtle}>做错即自动加入；重做正确后可手动标记“已掌握”。</Text>
+    <Pressable disabled={!ids.length} onPress={onStart} style={[styles.primaryWide,!ids.length&&styles.disabled]}><Text style={styles.primaryBtnText}>{ids.length?`重做全部 ${ids.length} 题`:'暂无错题'}</Text></Pressable>
+    {groups.map(([s,a])=><Pressable key={s} style={styles.card} onPress={()=>onSubject(s)}><View style={styles.cardTop}><View><Text style={styles.cardTitle}>{s}</Text><Text style={styles.cardSub}>{a.length} 道待复习</Text></View><Text style={styles.chev}>›</Text></View></Pressable>)}
+    {!ids.length&&<View style={styles.empty}><Text style={styles.emptyBig}>✓</Text><Text style={styles.h2}>错题本是空的</Text><Text style={styles.subtle}>去首页按章节开始练习。</Text></View>}
+  </ScrollView>
+}
+
+function StatsScreen({groups,progress,byId}){
+  const attempted=Object.keys(progress.answers).length;const scored=Object.keys(progress.answers).filter(id=>byId[id]&&!byId[id].excludedFromScore);const correct=scored.filter(id=>progress.answers[id]?.lastCorrect).length;const wrong=Object.keys(progress.wrong).length;
+  return <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
+    <Text style={styles.eyebrow}>PROGRESS</Text><Text style={styles.title}>学习统计</Text>
+    <View style={styles.statsRow}><StatBox label="已做" value={attempted}/><StatBox label="正确" value={correct}/><StatBox label="错题" value={wrong}/></View>
+    <Text style={styles.h2}>科目进度</Text>
+    {SUBJECT_ORDER.map(s=>{const list=groups[s];const ids=new Set(list.map(q=>q.id));const done=Object.keys(progress.answers).filter(id=>ids.has(id)).length;const scoreIds=Object.keys(progress.answers).filter(id=>ids.has(id)&&!byId[id]?.excludedFromScore);const c=scoreIds.filter(id=>progress.answers[id]?.lastCorrect).length;return <View key={s} style={styles.card}><View style={styles.cardTop}><Text style={styles.cardTitle}>{s}</Text><Text style={styles.metaText}>{done}/{list.length}</Text></View><ProgressBar value={pct(done,list.length)}/><View style={styles.cardMeta}><Text style={styles.metaText}>进度 {pct(done,list.length)}%</Text><Text style={styles.metaText}>最近正确率 {pct(c,scoreIds.length)}%</Text></View></View>})}
+  </ScrollView>
+}
+
+function SettingsScreen({onReset}){
+  return <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
+    <Text style={styles.eyebrow}>APP</Text><Text style={styles.title}>设置</Text>
+    <View style={styles.card}><Text style={styles.cardTitle}>题库说明</Text><Text style={styles.infoText}>内置 CFA Level I 1000 题，按十科和知识树重新分类。题目区不提前展示考点；作答后立即展开答案、具体考点与解析。学习记录仅保存在本机。</Text></View>
+    <View style={styles.card}><Text style={styles.cardTitle}>计分边界</Text><Text style={styles.infoText}>组合管理原题 Q7 存在题干与选项错位，保留用于校勘但不计入成绩；Q5 按题库意图选 B，同时在解析中保留严格数学定义说明。</Text></View>
+    <Pressable onPress={onReset} style={styles.dangerBtn}><Text style={styles.dangerText}>重置全部学习记录</Text></Pressable>
+    <Text style={styles.footer}>仅供个人学习使用 · v1.0</Text>
+  </ScrollView>
+}
+
+const styles=StyleSheet.create({
+  safe:{flex:1,backgroundColor:'#F7F8FA'},app:{flex:1},scroll:{flex:1},content:{padding:18,paddingBottom:110},center:{flex:1,alignItems:'center',justifyContent:'center'},
+  eyebrow:{fontSize:12,fontWeight:'800',letterSpacing:1.8,color:'#667085',marginTop:4},title:{fontSize:30,fontWeight:'800',color:'#111827',marginTop:4,marginBottom:6},h2:{fontSize:20,fontWeight:'800',color:'#111827',marginTop:22,marginBottom:10},subtle:{fontSize:14,lineHeight:21,color:'#667085'},smallMuted:{fontSize:13,color:'#667085'},back:{fontSize:16,fontWeight:'700',color:'#344054',paddingVertical:6},practiceHead:{flexDirection:'row',alignItems:'center',justifyContent:'space-between'},practiceTitle:{fontSize:17,fontWeight:'800',color:'#111827',marginBottom:10},
+  statsRow:{flexDirection:'row',gap:10,marginVertical:16},statBox:{flex:1,backgroundColor:'#FFFFFF',borderWidth:1,borderColor:'#E4E7EC',borderRadius:14,paddingVertical:14,alignItems:'center'},statValue:{fontSize:21,fontWeight:'800',color:'#111827'},statLabel:{fontSize:12,color:'#667085',marginTop:3},
+  actionRow:{flexDirection:'row',gap:10,marginBottom:8},primaryBtn:{flex:1,backgroundColor:'#111827',paddingVertical:13,borderRadius:12,alignItems:'center'},primaryWide:{backgroundColor:'#111827',paddingVertical:14,borderRadius:12,alignItems:'center',marginVertical:14},primaryBtnText:{color:'#fff',fontWeight:'800'},secondaryBtn:{flex:1,backgroundColor:'#fff',borderWidth:1,borderColor:'#D0D5DD',paddingVertical:13,borderRadius:12,alignItems:'center'},secondaryBtnText:{color:'#111827',fontWeight:'800'},disabled:{opacity:.35},
+  card:{backgroundColor:'#FFFFFF',borderWidth:1,borderColor:'#E4E7EC',borderRadius:16,padding:15,marginBottom:11},cardTop:{flexDirection:'row',justifyContent:'space-between',alignItems:'center',gap:10},cardTitle:{fontSize:17,fontWeight:'800',color:'#111827'},cardSub:{fontSize:13,color:'#667085',marginTop:3},chev:{fontSize:28,color:'#98A2B3'},cardMeta:{flexDirection:'row',justifyContent:'space-between',marginTop:8},metaText:{fontSize:12,color:'#667085'},sectionTitle:{fontSize:16,fontWeight:'800',lineHeight:23,color:'#111827',marginBottom:4},sectionBtn:{marginTop:11,backgroundColor:'#F2F4F7',borderRadius:10,paddingVertical:10,alignItems:'center'},sectionBtnText:{fontWeight:'800',color:'#344054'},
+  progressTrack:{height:7,backgroundColor:'#EAECF0',borderRadius:8,overflow:'hidden',marginTop:10},progressFill:{height:'100%',backgroundColor:'#344054',borderRadius:8},
+  tabs:{position:'absolute',left:0,right:0,bottom:0,flexDirection:'row',backgroundColor:'#FFFFFF',borderTopWidth:1,borderColor:'#E4E7EC',paddingBottom:10,paddingTop:8},tab:{flex:1,alignItems:'center',paddingVertical:7},tabActive:{},tabText:{fontSize:12,fontWeight:'700',color:'#98A2B3'},tabTextActive:{color:'#111827'},
+  qMeta:{flexDirection:'row',gap:7,flexWrap:'wrap',marginTop:14},pill:{backgroundColor:'#F2F4F7',borderRadius:999,paddingHorizontal:9,paddingVertical:5},pillBad:{backgroundColor:'#FEE4E2'},pillGood:{backgroundColor:'#D1FADF'},pillWarn:{backgroundColor:'#FEF0C7'},pillText:{fontSize:11,fontWeight:'700',color:'#344054'},qSection:{fontSize:13,color:'#667085',marginTop:10,lineHeight:19},question:{fontSize:19,fontWeight:'700',color:'#101828',lineHeight:28,marginTop:12,marginBottom:14},
+  option:{flexDirection:'row',alignItems:'flex-start',gap:10,backgroundColor:'#fff',borderWidth:1.5,borderColor:'#D0D5DD',borderRadius:14,padding:14,marginBottom:10},optionPicked:{borderColor:'#344054'},optionCorrect:{borderColor:'#12B76A',backgroundColor:'#ECFDF3'},optionWrong:{borderColor:'#F04438',backgroundColor:'#FEF3F2'},optLetter:{fontSize:16,fontWeight:'900',color:'#344054',width:22},optText:{flex:1,fontSize:15,lineHeight:22,color:'#101828'},hint:{fontSize:12,color:'#98A2B3',textAlign:'center',marginTop:4},
+  answerBox:{marginTop:14,backgroundColor:'#FFFFFF',borderWidth:1,borderColor:'#E4E7EC',borderRadius:16,padding:15},answerHead:{flexDirection:'row',justifyContent:'space-between',alignItems:'center',gap:8},answerResult:{fontSize:18,fontWeight:'900'},answerKey:{fontSize:13,fontWeight:'800',color:'#344054'},goodText:{color:'#027A48'},badText:{color:'#B42318'},warning:{backgroundColor:'#FFFAEB',borderRadius:10,padding:10,marginTop:10},warningText:{fontSize:13,lineHeight:19,color:'#7A2E0E'},infoBlock:{marginTop:14},infoTitle:{fontSize:14,fontWeight:'900',color:'#344054',marginBottom:5},infoText:{fontSize:14,lineHeight:22,color:'#344054'},
+  inlineActions:{flexDirection:'row',flexWrap:'wrap',gap:8,marginTop:16},ghostBtn:{paddingHorizontal:12,paddingVertical:9,borderRadius:10,borderWidth:1,borderColor:'#D0D5DD'},ghostBtnText:{fontSize:13,fontWeight:'800',color:'#344054'},masterBtn:{paddingHorizontal:12,paddingVertical:9,borderRadius:10,backgroundColor:'#ECFDF3'},masterBtnText:{fontSize:13,fontWeight:'800',color:'#027A48'},navRow:{flexDirection:'row',gap:10,marginTop:16},navBtn:{flex:1,backgroundColor:'#fff',borderWidth:1,borderColor:'#D0D5DD',borderRadius:12,paddingVertical:13,alignItems:'center'},nextBtn:{flex:1,backgroundColor:'#111827',borderRadius:12,paddingVertical:13,alignItems:'center'},navText:{fontWeight:'800',color:'#344054'},finishBox:{backgroundColor:'#F2F4F7',borderRadius:14,padding:15,marginTop:14},
+  empty:{alignItems:'center',paddingVertical:55},emptyBig:{fontSize:46,color:'#12B76A'},dangerBtn:{marginTop:20,borderWidth:1,borderColor:'#FDA29B',backgroundColor:'#FEF3F2',borderRadius:12,paddingVertical:13,alignItems:'center'},dangerText:{color:'#B42318',fontWeight:'800'},footer:{textAlign:'center',color:'#98A2B3',fontSize:12,marginTop:26}
+});

@@ -1,0 +1,14 @@
+{
+  "expo": {
+    "name": "CFA一级1000题",
+    "slug": "cfa-l1-1000",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "android": {
+      "package": "com.study.cfa1000",
+      "versionCode": 1
+    },
+    "plugins": ["expo-sqlite"]
+  }
+}
