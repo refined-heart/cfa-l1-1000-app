@@ -4,6 +4,11 @@ on:
   workflow_dispatch:
   push:
     branches: [ main ]
+    paths-ignore:
+      - 'build/**'
+
+permissions:
+  contents: write
 
 jobs:
   build:
@@ -27,28 +32,65 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Restore 1000-question dataset
-        run: npm run prepare:data
+      - name: Build, capture status, and publish result
+        shell: bash
+        run: |
+          set +e
+          mkdir -p build
+          : > build/build-log.txt
 
-      - name: Validate 1000-question dataset
-        run: npm run check:data
+          echo "=== prepare dataset ===" >> build/build-log.txt
+          npm run prepare:data >> build/build-log.txt 2>&1
+          STATUS=$?
 
-      - name: Install dependencies
-        run: npm install --no-audit --no-fund
+          if [ "$STATUS" -eq 0 ]; then
+            echo "=== validate dataset ===" >> build/build-log.txt
+            npm run check:data >> build/build-log.txt 2>&1
+            STATUS=$?
+          fi
 
-      - name: Generate native Android project
-        run: CI=1 npx expo prebuild --platform android --clean
+          if [ "$STATUS" -eq 0 ]; then
+            echo "=== install dependencies ===" >> build/build-log.txt
+            npm install --no-audit --no-fund >> build/build-log.txt 2>&1
+            STATUS=$?
+          fi
 
-      - name: Build installable debug APK
-        working-directory: android
-        run: ./gradlew assembleDebug --no-daemon
+          if [ "$STATUS" -eq 0 ]; then
+            echo "=== expo prebuild ===" >> build/build-log.txt
+            CI=1 npx expo prebuild --platform android --clean >> build/build-log.txt 2>&1
+            STATUS=$?
+          fi
 
-      - name: Rename APK
-        run: cp android/app/build/outputs/apk/debug/app-debug.apk CFA-L1-1000.apk
+          if [ "$STATUS" -eq 0 ]; then
+            echo "=== gradle assembleDebug ===" >> build/build-log.txt
+            (cd android && ./gradlew assembleDebug --no-daemon) >> build/build-log.txt 2>&1
+            STATUS=$?
+          fi
 
-      - name: Upload APK
+          if [ "$STATUS" -eq 0 ]; then
+            cp android/app/build/outputs/apk/debug/app-debug.apk build/CFA-L1-1000.apk
+            echo "success" > build/status.txt
+          else
+            echo "failure" > build/status.txt
+          fi
+
+          echo "exit_code=$STATUS" >> build/build-log.txt
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add build/status.txt build/build-log.txt
+          if [ -f build/CFA-L1-1000.apk ]; then
+            git add build/CFA-L1-1000.apk
+          fi
+          git commit -m "Publish Android build result [skip apk build]" || true
+          git push
+
+          exit "$STATUS"
+
+      - name: Upload APK artifact
+        if: success()
         uses: actions/upload-artifact@v4
         with:
           name: CFA-L1-1000-APK
-          path: CFA-L1-1000.apk
+          path: build/CFA-L1-1000.apk
           retention-days: 30
