@@ -14,3 +14,5 @@
 - 数据不完整 = 0
 
 > apk-build-test 分支仅用于验证 Android 云构建链。
+
+Build retry after Android SDK action upgrade.
