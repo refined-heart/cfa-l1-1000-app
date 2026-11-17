@@ -1,0 +1,19 @@
+{
+  "name": "CFA Level I 1000 - Online Preview",
+  "image": "mcr.microsoft.com/devcontainers/javascript-node:22",
+  "postCreateCommand": "npm install --no-audit --no-fund && npm run check:data",
+  "postStartCommand": "bash .devcontainer/start-preview.sh",
+  "forwardPorts": [8081],
+  "portsAttributes": {
+    "8081": {
+      "label": "CFA 1000题 浏览器预览",
+      "onAutoForward": "openBrowser",
+      "visibility": "private"
+    }
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": ["esbenp.prettier-vscode"]
+    }
+  }
+}
