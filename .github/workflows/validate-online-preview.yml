@@ -1,0 +1,50 @@
+name: Validate Online Preview
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - dev/online-preview
+    paths:
+      - "package.json"
+      - "App.js"
+      - "src/**"
+      - "scripts/**"
+      - ".devcontainer/**"
+      - ".github/workflows/validate-online-preview.yml"
+
+jobs:
+  web-preview:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Use Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Verify 1000 questions
+        run: npm run check:data
+
+      - name: Export browser preview
+        run: npm run build:web
+
+      - name: Verify generated HTML and JavaScript
+        shell: bash
+        run: |
+          test -f dist/index.html
+          find dist -type f | grep -Eq '\.(js|html)$'
+          du -sh dist
+          echo "Browser build passed."
+
+      - name: Archive browser build for QA
+        uses: actions/upload-artifact@v4
+        with:
+          name: cfa-web-preview-build
+          path: dist/
+          retention-days: 14
