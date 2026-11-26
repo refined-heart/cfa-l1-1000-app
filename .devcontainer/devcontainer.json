@@ -1,19 +1,10 @@
 {
-  "name": "CFA Level I 1000 - Online Preview",
+  "name": "CFA Study V2 - Online QA",
   "image": "mcr.microsoft.com/devcontainers/javascript-node:22",
-  "postCreateCommand": "npm install --no-audit --no-fund && npm run check:data",
-  "postStartCommand": "bash .devcontainer/start-preview.sh",
-  "forwardPorts": [8081],
+  "postCreateCommand": "cd v2 && npm install --no-audit --no-fund && npm run test:logic",
+  "postStartCommand": "bash .devcontainer/start-v2.sh",
+  "forwardPorts": [5173],
   "portsAttributes": {
-    "8081": {
-      "label": "CFA 1000题 浏览器预览",
-      "onAutoForward": "notify",
-      "visibility": "private"
-    }
-  },
-  "customizations": {
-    "vscode": {
-      "extensions": ["esbenp.prettier-vscode"]
-    }
+    "5173": {"label": "CFA V2 浏览器测试", "onAutoForward": "notify", "visibility": "private"}
   }
 }
