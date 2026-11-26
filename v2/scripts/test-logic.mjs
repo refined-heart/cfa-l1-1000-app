@@ -1,0 +1,23 @@
+import assert from 'node:assert/strict';
+import {SUBJECTS,moduleNumber,noteFor,titleFor} from '../src/lib/curriculum.js';
+import {blankData,isDue,isWrong,isEasy,isProblem,createProgressUpdate,makeProfile,initialState,makeBackup,validateBackup} from '../src/lib/persistence.js';
+assert.equal(SUBJECTS.length,11);
+assert.equal(moduleNumber('Module 19: Mortgage-Backed Security'),19);
+assert.match(noteFor('Fixed Income','Module 12: Yield-Based Bond Convexity').overview,/凸性/);
+assert.equal(titleFor('Fixed Income','Module 12: Yield-Based Bond Convexity'),'债券凸性与组合');
+let d=blankData();const id='practice:123';
+assert.equal(isDue(d,id),true);
+d=createProgressUpdate(d,id,'B',false,false,2000);
+assert.equal(isWrong(d,id),true);
+assert.equal(d.answers[id].totalSeconds,2);
+d=createProgressUpdate(d,id,'C',true,true,1900);
+assert.equal(isWrong(d,id),true); // keep in book until explicitly mastered
+assert.equal(d.answers[id].reviewStreak,1);
+d={...d,easy:{[id]:true}};
+assert.equal(isEasy(d,id),true);assert.equal(isDue(d,id),false);assert.equal(isWrong(d,id),false);
+d={...d,easy:{},flags:{[id]:{exclude:true,reason:'错位'}}};
+assert.equal(isProblem(d,id),true);assert.equal(isWrong(d,id),false);
+const state=initialState();const backup=makeBackup(state,{id:'practice-2026-v2',stats:{count:2318}});
+assert.equal(validateBackup(backup).profiles.length,1);
+assert.throws(()=>validateBackup({...backup,version:3}));
+console.log('PASS: subject tree, note links, wrong-book logic, easy/flag exclusion, backups');
