@@ -1,0 +1,37 @@
+name: Validate CFA Study V2
+on:
+  workflow_dispatch:
+  push:
+    branches: [v2]
+    paths:
+      - 'v2/**'
+      - '.devcontainer/**'
+      - '.github/workflows/validate-v2.yml'
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: v2
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install
+        run: npm install --no-audit --no-fund
+      - name: Test learning-record logic
+        run: npm run test:logic
+      - name: Build web app
+        run: npm run build
+      - name: Verify assets
+        run: |
+          test -f dist/index.html
+          find dist -name '*.js' | grep -q .
+          echo 'V2 web build OK'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cfa-v2-web-preview
+          path: v2/dist/
+          retention-days: 14
