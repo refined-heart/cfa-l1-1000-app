@@ -7,7 +7,7 @@
   "portsAttributes": {
     "8081": {
       "label": "CFA 1000题 浏览器预览",
-      "onAutoForward": "openBrowser",
+      "onAutoForward": "notify",
       "visibility": "private"
     }
   },
