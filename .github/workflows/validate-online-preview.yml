@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - dev/online-preview
+      - preview
     paths:
       - "package.json"
       - "App.js"
