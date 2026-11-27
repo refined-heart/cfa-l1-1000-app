@@ -1,10 +1,16 @@
 {
-  "name": "CFA Study V2 - Online QA",
+  "name": "Knowledge Studio V3 - CFA, English, Mathematics, Finance",
   "image": "mcr.microsoft.com/devcontainers/javascript-node:22",
-  "postCreateCommand": "cd v2 && npm install --no-audit --no-fund && npm run test:logic",
+  "postCreateCommand": "cd v2 && npm install --no-audit --no-fund && npm run check:v3",
   "postStartCommand": "bash .devcontainer/start-v2.sh",
-  "forwardPorts": [5173],
+  "forwardPorts": [
+    5173
+  ],
   "portsAttributes": {
-    "5173": {"label": "CFA V2 浏览器测试", "onAutoForward": "notify", "visibility": "private"}
+    "5173": {
+      "label": "Knowledge Studio V3 浏览器预览",
+      "onAutoForward": "notify",
+      "visibility": "private"
+    }
   }
 }
