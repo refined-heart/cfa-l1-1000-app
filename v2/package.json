@@ -20,7 +20,8 @@
     "idb-keyval": "^6.2.2",
     "dompurify": "^3.2.6",
     "marked": "^15.0.12",
-    "mammoth": "^1.9.1"
+    "mammoth": "^1.9.1",
+    "katex": "^0.16.22"
   },
   "devDependencies": {
     "vite": "^7.1.1"
