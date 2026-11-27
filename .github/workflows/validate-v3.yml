@@ -1,0 +1,33 @@
+name: Validate Knowledge Studio V3
+on:
+  push:
+    branches: [v3]
+    paths:
+      - "v2/**"
+      - ".devcontainer/**"
+      - ".github/workflows/validate-v3.yml"
+  workflow_dispatch:
+jobs:
+  web:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install V3 dependencies
+        run: cd v2 && npm install --no-audit --no-fund
+      - name: Test learning records V2 compatibility
+        run: cd v2 && npm run test:logic
+      - name: Test V3 archive and dictionary logic
+        run: cd v2 && npm run test:v3
+      - name: Compile V3 site
+        run: cd v2 && npm run build
+      - name: Verify output
+        run: test -f v2/dist/index.html && find v2/dist -type f | grep -Eq '\.js$'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: CFA-Knowledge-Studio-V3-preview
+          path: v2/dist/
+          retention-days: 14
