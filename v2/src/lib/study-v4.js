@@ -1,6 +1,6 @@
 import JSZip from 'jszip';
 import {get,set} from 'idb-keyval';
-import {splitAnswer,normalizeWord,readVocabularyZip,cleanWord} from './v3-data';
+import {splitAnswer,normalizeWord,readVocabularyZip,cleanWord} from './v3-data.js';
 
 const DOC_EXT=/\.(md|markdown|html?|json|txt|pdf|docx)$/i;
 const MEDIA_EXT=/\.(png|jpe?g|gif|webp|svg|bmp|pdf|mp3|mp4|woff2?)$/i;
