@@ -78,7 +78,7 @@ export async function importCompleteCourse(file,kind,progress=()=>{}){
   const path=supported[i],entry=zip.file(path),size=Number(entry?._data?.uncompressedSize||0),base=removeExt(path);
   if(i%35===0)progress('课程结构化：'+(i+1)+' / '+supported.length+' 文件');
   if(seen.has(base)&&textExt.test(path)){counts.paired++;continue}
-  if(size>12*1024*1024){
+  if(size>12*1024*1024&&textExt.test(path)){
    counts.notRendered++;counts.skipped.push({path,reason:'单文件超过 12MB，保留在原包中，可单独查看/下载'});continue;
   }
   try{
