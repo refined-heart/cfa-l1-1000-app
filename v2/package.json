@@ -10,7 +10,8 @@
     "test:logic": "node scripts/test-logic.mjs",
     "test:v3": "node scripts/test-v3.mjs",
     "check:v3": "npm run test:logic && npm run test:v3 && npm run build",
-    "check:v4": "npm run test:logic && npm run test:v3 && npm run build"
+    "check:v4": "npm run test:logic && npm run test:v3 && npm run test:v4 && npm run build",
+    "test:v4": "node scripts/test-v4.mjs"
   },
   "dependencies": {
     "react": "19.2.3",
