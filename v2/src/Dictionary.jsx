@@ -26,6 +26,7 @@ export const SEED={
  'accrual':['权责发生制项目','Recognition of income or expense when earned or incurred rather than when cash moves.'],
  'impairment':['减值','Recognition of a loss in the recoverable or carrying value of an asset.']
 };
+const STOP=new Set('the this that these those with from what which when where whose while have has had will would should could their there than then also only most least likely more less some into upon over under after before based using given following whether between among other each many same both does were been being versus such terms term number amount question answer option choice correct select calculate'.split(' '));
 const seed=(word)=>{const v=SEED[word];return v?{word,zh:v[0],en:v[1],source:'内置示范词条（非上传资料）'}:null};
 const fields=[
  ['word','英文单词'],['zh','中文意思'],['en','英文解释'],['ipaUK','英音音标 IPA'],['ipaUS','美音音标 IPA'],
@@ -111,8 +112,8 @@ export function ModuleGlossary({questions,subject,module}){
  const list=useMemo(()=>{
   const counts={};
   for(const q of questions||[]){
-   for(const m of String(q.stemText||'').toLowerCase().matchAll(/\b[a-z]{4,}\b/g)){
-    const w=m[0];if(SEED[w]||edits.words[w])counts[w]=(counts[w]||0)+1;
+   for(const m of [q.stemText||'',...(q.choices||[]).map(c=>c.html||''),q.feedbackHtml||''].join(' ').replace(/<[^>]+>/g,' ').toLowerCase().matchAll(/\b[a-z]{4,}\b/g)){
+    const w=m[0];if(!STOP.has(w)&&(SEED[w]||edits.words[w]))counts[w]=(counts[w]||0)+1;
    }
   }
   const selected=new Set(edits.moduleWords[key]||[]);
