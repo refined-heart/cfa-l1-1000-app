@@ -1,5 +1,5 @@
 import JSZip from 'jszip';
-import {get,set} from 'idb-keyval';
+import {get,set,del} from 'idb-keyval';
 import {splitAnswer,normalizeWord,readVocabularyZip,cleanWord} from './v3-data.js';
 
 const DOC_EXT=/\.(md|markdown|html?|json|txt|pdf|docx)$/i;
@@ -8,6 +8,8 @@ const ZIP_EXT=/\.zip$/i;
 const textExt=/\.(md|markdown|html?|json|txt)$/i;
 const IMAGE_EXT=/\.(png|jpe?g|gif|webp|svg|bmp)$/i;
 const V4_COURSE='cfa-v4-full-course-';
+const V4_ASSETS='cfa-v4-course-assets-';
+const assetZipCache=new Map();
 const V4_VOCAB='cfa-v4-vocabulary-original';
 const assetCache=new Map();
 const zipCache=new Map();
@@ -163,6 +165,26 @@ export async function importCompleteCourse(file,kind,progress=()=>{}){
  zipCache.set(kind,zip);
  return {kind,docs,summary};
 }
+export async function discardCourseRaw(kind){
+ await del(V4_COURSE+kind);
+ // Keep the parsed ZIP for the current browser session, even if persistence failed.
+}
+export async function attachCourseAssetArchive(file,kind){
+ const zip=await JSZip.loadAsync(file);
+ const images=Object.keys(zip.files).filter(n=>IMAGE_EXT.test(n)).length;
+ if(!images)throw new Error('附件 ZIP 中没有识别出 png/jpg/svg 等图片文件');
+ assetZipCache.set(kind,zip);
+ try{await set(V4_ASSETS+kind,file)}catch{
+  return {images,saved:false,warning:'配套图片包未成功缓存在浏览器，下次启动需要重新导入'};
+ }
+ return {images,saved:true};
+}
+export async function loadCourseAssetArchive(kind){
+ if(assetZipCache.has(kind))return assetZipCache.get(kind);
+ const file=await get(V4_ASSETS+kind);if(!file)return null;
+ const zip=await JSZip.loadAsync(file);assetZipCache.set(kind,zip);return zip;
+}
+
 export async function loadCourseArchive(kind){
  if(zipCache.has(kind))return zipCache.get(kind);
  const file=await get(V4_COURSE+kind);
@@ -171,7 +193,7 @@ export async function loadCourseArchive(kind){
 }
 function findAssetPath(zip,docPath,src){
  const clean=decodeURIComponent(String(src||'').split('?')[0].split('#')[0]).replace(/^file:\/\/\//,'').replace(/^\/+/,'').replace(/\\/g,'/');
- if(!clean||/^(https?:|data:|blob:)/i.test(clean))return null;
+ if(!clean||/^(data:|blob:)/i.test(clean))return null;
  const parent=docPath.split('/').slice(0,-1).join('/');
  const parts=[clean,parent+'/'+clean,parent+'/assets/'+basename(clean),parent+'/_assets/'+basename(clean)];
  for(const p of parts){const n=safePath(p);if(zip.file(n))return n;}
@@ -188,12 +210,16 @@ export async function materializeCourseMedia(doc,progress=()=>{}){
  const replacements=new Map(),missing=[];
  let n=0;
  for(const src of references){
-  if(/^(data:|blob:|https?:)/i.test(src))continue;
+  if(/^(data:|blob:)/i.test(src))continue;
   if(++n>125){missing.push(src+'（图片超过 125 项，本页按需查看原始包）');continue;}
-  const path=findAssetPath(zip,doc.path,src);
+  let selectedZip=zip,path=findAssetPath(zip,doc.path,src);
+  if(!path){
+   const supplement=await loadCourseAssetArchive(doc.kind);
+   if(supplement){path=findAssetPath(supplement,doc.path,src);selectedZip=supplement;}
+  }
   if(!path){missing.push(src);continue;}
   try {
-   const b64=await zip.file(path).async('base64');
+   const b64=await selectedZip.file(path).async('base64');
    replacements.set(src,'data:'+mediaType(path)+';base64,'+b64);
   } catch {missing.push(src);}
  }
