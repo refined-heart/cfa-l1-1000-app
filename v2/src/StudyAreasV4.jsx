@@ -194,12 +194,6 @@ export function EnglishArea(){
  async function exportEdits(){const zip=new JSZip();zip.file('vocabulary-edited.json',JSON.stringify({schema:'cfa-v4-english-overrides',version:4,words:edits.words,removedWords:edits.removedWords,at:new Date().toISOString()},null,2));
   downloadBlob(await zip.generateAsync({type:'blob',compression:'DEFLATE'}),'Financial_English_V5_Editable_Vocabulary.zip');}
  const units=V5_UNITS;
- const wordList=useMemo(()=>{
-  const unitData=book?.units?.[unitKey]||[];
-  const base=unitData.length?unitData:Object.keys(edits.words);
-  return base.filter(w=>!edits.removedWords[w]&&(!query||[w,edits.words[w]?.zh,edits.words[w]?.en].join(' ').toLowerCase().includes(query.toLowerCase())));
- },[book,unitKey,edits,query]);
- const visible=wordList.slice(page*35,(page+1)*35);
  const activeUnit=unit||units[0];
  const unitKey=useMemo(()=>{
   const keys=Object.keys(book?.units||{});
@@ -208,6 +202,12 @@ export function EnglishArea(){
   if(number)return keys.find(k=>new RegExp('Unit\\s*'+number+'\\b','i').test(k))||activeUnit;
   return keys.find(k=>k.replace(/[\s·:：–—-]+/g,'').includes(activeUnit.replace(/[\s·:：–—-]+/g,'')))||activeUnit;
  },[book?.units,activeUnit]);
+ const wordList=useMemo(()=>{
+  const unitData=book?.units?.[unitKey]||[];
+  const base=unitData.length?unitData:Object.keys(edits.words);
+  return base.filter(w=>!edits.removedWords[w]&&(!query||[w,edits.words[w]?.zh,edits.words[w]?.en].join(' ').toLowerCase().includes(query.toLowerCase())));
+ },[book,unitKey,edits,query]);
+ const visible=wordList.slice(page*35,(page+1)*35);
  return <section className="sv4-study">
   <div className="sv4-page-heading"><Kicker>PROFESSIONAL ENGLISH · CFA LEVEL I · V5 ORIGINAL</Kicker><h1>金融英语 V5 · 完整教材</h1><p>按照原著教材阅读，而非只列单词：Unit 00–15、词根词缀、原版复杂例句、金融词族与词汇网络，结合双语词典与逐词编辑。</p></div>
   <div className="sv4-panel sv4-import-bar"><div className="sv4-inline"><input type="file" accept=".zip" ref={input} hidden onChange={importZip}/>
