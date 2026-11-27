@@ -1,6 +1,8 @@
 import React,{useEffect,useMemo,useRef,useState} from 'react';
 import {marked} from 'marked';
 import DOMPurify from 'dompurify';
+import katex from 'katex';
+import 'katex/dist/katex.min.css';
 import JSZip from 'jszip';
 import {get,set} from 'idb-keyval';
 import {useWorkspace} from './workspace-context';
@@ -13,9 +15,27 @@ import {
 import {OtherArea,EmptyCFAModule} from './StudyAreas';
 import './study-v4.css';
 
+function renderCourseMarkdown(source){
+ const stash=[];
+ const put=(formula,displayMode)=>{
+  let rendered;
+  try{rendered=katex.renderToString(formula,{throwOnError:false,displayMode,strict:'ignore'})}
+  catch{rendered='<code>Formula unavailable</code>'}
+  const key='COURSEMATH'+String(stash.length).padStart(6,'0')+'TOKEN';
+  stash.push([key,rendered]);return key;
+ };
+ let text=String(source||'');
+ text=text.replace(/\$\$([\s\S]+?)\$\$/g,(_,x)=>put(x,true));
+ text=text.replace(/\\\[([\s\S]+?)\\\]/g,(_,x)=>put(x,true));
+ text=text.replace(/\\\(([\s\S]+?)\\\)/g,(_,x)=>put(x,false));
+ text=text.replace(/(^|[^$])\$([^$\n]+)\$(?!\$)/g,(_,pre,x)=>pre+put(x,false));
+ let html=marked.parse(text,{gfm:true,breaks:true});
+ for(const [token,rendered] of stash)html=html.replaceAll(token,rendered);
+ return html;
+}
 const htmlSafe=(value,format='markdown')=>{
- const s=format==='html'?value:marked.parse(String(value||''),{gfm:true,breaks:true});
- return {__html:DOMPurify.sanitize(s,{USE_PROFILES:{html:true},ADD_ATTR:['target','align']})};
+ const content=format==='html'?value:renderCourseMarkdown(value);
+ return {__html:DOMPurify.sanitize(content,{USE_PROFILES:{html:true,mathMl:true,svg:true},ADD_ATTR:['target','align','class']})};
 };
 const pretty=x=>String(x||'').replace(/^0*\d+[_-]+/,'').replace(/_/g,' ');
 const isPdf=x=>x==='pdf',isDocx=x=>x==='docx';
