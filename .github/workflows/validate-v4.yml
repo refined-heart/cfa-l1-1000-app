@@ -19,7 +19,7 @@ jobs:
       - name: Install V4 dependencies
         run: cd v2 && npm install --no-audit --no-fund
       - name: Validate question bank and V3 compatibility
-        run: cd v2 && npm run test:logic && npm run test:v3
+        run: cd v2 && npm run test:logic && npm run test:v3 && node scripts/test-v4.mjs
       - name: Compile V4 complete curriculum interface
         run: cd v2 && npm run build
       - name: Check compiled web
