@@ -1,0 +1,35 @@
+name: Validate CFA Textbook V4
+on:
+  push:
+    branches: [v4-curriculum]
+    paths:
+      - "v2/**"
+      - ".devcontainer/**"
+      - ".github/workflows/validate-v4.yml"
+  workflow_dispatch:
+jobs:
+  web:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install V4 dependencies
+        run: cd v2 && npm install --no-audit --no-fund
+      - name: Validate question bank and V3 compatibility
+        run: cd v2 && npm run test:logic && npm run test:v3
+      - name: Compile V4 complete curriculum interface
+        run: cd v2 && npm run build
+      - name: Check compiled web
+        shell: bash
+        run: |
+          test -f v2/dist/index.html
+          find v2/dist -type f | grep -Eq '\.js$'
+          du -sh v2/dist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Knowledge-Studio-V4-Curriculum
+          path: v2/dist/
+          retention-days: 14
