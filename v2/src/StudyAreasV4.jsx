@@ -187,7 +187,7 @@ export function EnglishArea(){
    const {words,...summary}=r;
    patch(old=>({...old,words:{...words,...old.words},wordSources:[...(old.wordSources||[]),{filename:f.name,count:r.wordCount,at:new Date().toISOString()}]}));
    await set(V5_KEY,summary);setBook(summary);setUnit('');setQuery('');setPage(0);setTab('reading');
-   setBusy('导入完成。原版 PDF '+(r.pdf?'已识别':'未识别')+'；提取词条 '+r.wordCount+' 个；结构化来源 '+r.structuredWords+' 个，词族 '+r.treeWords+' 个。');
+   setBusy('导入完成。原版 PDF '+(r.pdf?'已识别':'未识别')+'；提取词条 '+r.wordCount+' 个；结构化来源 '+r.structuredWords+' 个、词族 '+r.treeWords+' 个、A-Z 索引 '+r.indexWords+' 个。');
   }catch(err){setBusy('导入失败：'+err.message)}
  }
  async function exportOriginal(){try{const f=await get('cfa-v4-vocabulary-original');if(!f)throw new Error('原始 ZIP 未被缓存');downloadBlob(f,'CFA_Financial_English_V5_Original.zip')}catch(e){setBusy(e.message)}}
@@ -195,12 +195,19 @@ export function EnglishArea(){
   downloadBlob(await zip.generateAsync({type:'blob',compression:'DEFLATE'}),'Financial_English_V5_Editable_Vocabulary.zip');}
  const units=V5_UNITS;
  const wordList=useMemo(()=>{
-  const unitData=book?.units?.[unit]||[];
+  const unitData=book?.units?.[unitKey]||[];
   const base=unitData.length?unitData:Object.keys(edits.words);
   return base.filter(w=>!edits.removedWords[w]&&(!query||[w,edits.words[w]?.zh,edits.words[w]?.en].join(' ').toLowerCase().includes(query.toLowerCase())));
- },[book,unit,edits,query]);
+ },[book,unitKey,edits,query]);
  const visible=wordList.slice(page*35,(page+1)*35);
  const activeUnit=unit||units[0];
+ const unitKey=useMemo(()=>{
+  const keys=Object.keys(book?.units||{});
+  if(keys.includes(activeUnit))return activeUnit;
+  const number=activeUnit.match(/Unit\s+(\d{2})/i)?.[1];
+  if(number)return keys.find(k=>new RegExp('Unit\\s*'+number+'\\b','i').test(k))||activeUnit;
+  return keys.find(k=>k.replace(/[\s·:：–—-]+/g,'').includes(activeUnit.replace(/[\s·:：–—-]+/g,'')))||activeUnit;
+ },[book?.units,activeUnit]);
  return <section className="sv4-study">
   <div className="sv4-page-heading"><Kicker>PROFESSIONAL ENGLISH · CFA LEVEL I · V5 ORIGINAL</Kicker><h1>金融英语 V5 · 完整教材</h1><p>按照原著教材阅读，而非只列单词：Unit 00–15、词根词缀、原版复杂例句、金融词族与词汇网络，结合双语词典与逐词编辑。</p></div>
   <div className="sv4-panel sv4-import-bar"><div className="sv4-inline"><input type="file" accept=".zip" ref={input} hidden onChange={importZip}/>
@@ -211,7 +218,7 @@ export function EnglishArea(){
    <Status>{busy}</Status><Status>{book?.storageWarning}</Status></div>
   {!book?<NoMaterial text="请选择你上传的 CFA_Financial_English_Vocabulary_V5_Complete(1).zip。系统将以完整教材为主：保留 PDF 原版阅读，自动建立 Unit 课程目录和可编辑词汇索引。"/>:
   <div className="sv4-book">
-   <div className="sv4-tabs">{[['reading','原版全书阅读'],['units','分 Unit 学习'],['dictionary','单词词典']].map(([k,label])=><button key={k} className={tab===k?'on':''} onClick={()=>setTab(k)}>{label}</button>)}</div>
+   <div className="sv4-tabs">{[['reading','原版全书阅读'],['units','分 Unit 学习'],['dictionary','单词词典']].map(([k,label])=><button key={k} className={tab===k?'on':''} onClick={()=>{setTab(k);if(k==='dictionary'){setUnit('');setPage(0)}}}>{label}</button>)}</div>
    {tab==='reading'&&<div className="sv4-paper">
     <div className="sv4-reader-top"><div><h2>V5 原版全书</h2><p>浏览器 PDF 自带目录、搜索、缩放、打印功能；34 张词汇网络图和全部原始例句以原 PDF 为准，不删图、不改写例句。</p></div>
      <Pill>{book.pdf||'未找到 PDF'}</Pill></div>
@@ -221,9 +228,9 @@ export function EnglishArea(){
    {tab==='units'&&<div className="sv4-unit-study"><aside><h3>教材教学目录</h3>{units.map(u=><button className={u===activeUnit?'on':''} key={u} onClick={()=>{setUnit(u);setPage(0);setQuery('')}}>{u}</button>)}</aside>
     <main><div className="sv4-paper"><Kicker>原版 V5 · UNIT</Kicker><h2>{activeUnit}</h2>
      <p>这一单元的正文、复杂例句、词汇网络图请从「原版全书阅读」进入；下方是从原始词族资料提取的可互动词条，不会用通用模板替代教材论述。</p>
-     {book.units?.[activeUnit]?.length?<p>本单元已提取 {book.units[activeUnit].length} 个词族词条，点击单词可查看或修改中英文解释及音标。</p>:<Status>该小节尚未在导入文件中找到独立词族条目；原 PDF 正文仍可阅读。</Status>}
-     <div className="sv4-wordcards">{(book.units?.[activeUnit]||[]).slice(0,300).map(w=><button key={w} onClick={()=>setWord(w)}><b>{w}</b><span>{edits.words[w]?.zh||'查看词条 / 补充中文'}</span></button>)}</div>
-     {(book.units?.[activeUnit]?.length||0)>300&&<p>本节词条较多，建议使用「单词词典」搜索全部词条。</p>}
+     {book.units?.[unitKey]?.length?<p>本单元已提取 {book.units[activeUnit].length} 个词族词条，点击单词可查看或修改中英文解释及音标。</p>:<Status>该小节尚未在导入文件中找到独立词族条目；原 PDF 正文仍可阅读。</Status>}
+     <div className="sv4-wordcards">{(book.units?.[unitKey]||[]).slice(0,300).map(w=><button key={w} onClick={()=>setWord(w)}><b>{w}</b><span>{edits.words[w]?.zh||'查看词条 / 补充中文'}</span></button>)}</div>
+     {(book.units?.[unitKey]?.length||0)>300&&<p>本节词条较多，建议使用「单词词典」搜索全部词条。</p>}
     </div></main></div>}
    {tab==='dictionary'&&<div className="sv4-panel"><h2>V5 可编辑专业词典</h2>
      <div className="sv4-inline"><input value={query} placeholder="搜索英文、中文、金融术语" onChange={e=>{setQuery(e.target.value);setPage(0)}}/>
