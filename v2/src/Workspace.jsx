@@ -2,7 +2,7 @@ import React,{useRef,useState} from 'react';
 import JSZip from 'jszip';
 import PracticeApp from './App';
 import {WordPopup,clickableWordAt} from './Dictionary';
-import {EnglishArea,TutorialArea,OtherArea,EmptyCFAModule} from './StudyAreas';
+import {EnglishArea,TutorialArea,OtherArea,EmptyCFAModule} from './StudyAreasV4';
 import {WorkspaceProvider,useWorkspace} from './workspace-context';
 import {downloadBlob,exportPracticeZip,loadPracticeFile,loadVocabularySource} from './lib/v3-data';
 import {loadBank,loadState,makeBackup,saveState,validateBackup} from './lib/persistence';
@@ -65,7 +65,7 @@ function WorkspaceShell(){
     <input ref={backupInput} hidden type="file" accept=".zip" onChange={importData}/><button onClick={()=>backupInput.current?.click()}>导入数据备份 ZIP</button>
     <button onClick={()=>{setArea('CFA');setModule('CFA1 教程');setDataOpen(false)}}>导入教程 ZIP</button><button onClick={()=>{setArea('专业英语');setDataOpen(false)}}>导入词库 ZIP</button>
    </div><p className="v3-muted">{dataBusy||'完整 Practice ZIP 导入入口位于 CFA1 Practice；编辑过的中文解析通过 _study/v3-overrides.json 附加保存，不覆盖原英文内容。'}</p></div>}
-  <div className="v3-active-context"><span>{area}</span>{area==='CFA'&&<><span>／</span><strong>{module}</strong></>}{area==='专业英语'&&<><span>／</span><strong>CFA1 金融英语</strong></>}<span className="v3-v-label">V3 · Browser QA</span></div>
+  <div className="v3-active-context"><span>{area}</span>{area==='CFA'&&<><span>／</span><strong>{module}</strong></>}{area==='专业英语'&&<><span>／</span><strong>CFA1 金融英语</strong></>}<span className="v3-v-label">V4 · Curriculum QA</span></div>
   <div className="v3-area-body">
    {area==='CFA'&&module==='CFA1 Practice'&&<PracticeApp/>}
    {area==='CFA'&&module==='CFA1 教程'&&<TutorialArea/>}
