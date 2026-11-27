@@ -37,13 +37,17 @@ function docTitle(raw,path){
  const h=String(raw||'').match(/^\s*#{1,3}\s+(.+?)\s*$/m);
  return human(h?.[1]||basename(path));
 }
-function courseCategory(path){
+function courseCategory(path,metadata={}){
  const p=safePath(path).split('/').filter(Boolean);
- // User source folders are the primary curriculum hierarchy, not a generated one.
+ // The original ZIP folder hierarchy and source metadata define classification.
  const folders=p.slice(0,-1).filter(s=>!/^(__MACOSX|_assets|assets)$/i.test(s));
  const meaningful=folders.filter(s=>!/^(Course_Content|delivery|content|courses|pages)$/i.test(s));
- return {course:human(meaningful[0]||folders[0]||'未归类课程'),
-         unit:human(meaningful[1]||folders[1]||'原始章节'),
+ const src=metadata&&typeof metadata==='object'?metadata:{};
+ const field=(keys)=>keys.map(k=>src[k]).find(v=>typeof v==='string'&&v.trim())||'';
+ const metaCourse=field(['courseName','course_name','subject','course','discipline','curriculum','subject_name']);
+ const metaUnit=field(['moduleTitle','module_title','chapter','chapter_name','module','topic','topic_title','learning_module']);
+ return {course:human(meaningful[0]||metaCourse||'原始课程 · 未分配'),
+         unit:human(meaningful[1]||metaUnit||'原始章节 · 未分配'),
          hierarchy:folders.map(human)};
 }
 function shouldIgnore(p){
@@ -51,6 +55,14 @@ function shouldIgnore(p){
 }
 function formatRank(p){return /\.(md|markdown)$/i.test(p)?0:/\.html?$/i.test(p)?1:/\.json$/i.test(p)?2:3;}
 function isBodyJson(o){return o&&typeof o==='object'&&(!Array.isArray(o))&&(['content','body','text','blocks','sections','markdown','html','description','learning_outcomes','learning_objectives'].some(k=>o[k]!==undefined));}
+function splitHtmlAnswer(source){
+ const html=String(source||'');
+ const pattern=/<h[1-6][^>]*>\s*(?:<[^>]*>)*\s*(?:answers?|solutions?|explanations?|correct answers?|参考答案|答案解析|答案|解析)\b[^<]*<\/h[1-6]>/i;
+ const m=pattern.exec(html);
+ if(!m||m.index<html.length*.2)return {body:html,answers:'',hasAnswer:false};
+ return {body:html.slice(0,m.index),answers:html.slice(m.index),hasAnswer:true};
+}
+
 export async function importCompleteCourse(file,kind,progress=()=>{}){
  if(!file||!ZIP_EXT.test(file.name))throw new Error('请选择课程 ZIP 原文件');
  const zip=await JSZip.loadAsync(file);
@@ -71,19 +83,49 @@ export async function importCompleteCourse(file,kind,progress=()=>{}){
    const ext=path.split('.').pop().toLowerCase();
    let raw='',sourceFormat=ext;
    if(/^(md|markdown|txt|html|htm)$/.test(ext))raw=await entry.async('string');
+   let sourceMeta={},jsonAnswers='';
    if(ext==='json'){
     const source=await entry.async('string');
     const obj=JSON.parse(source);
-    if(!isBodyJson(obj)){
+    sourceMeta=obj;
+    if(!isBodyJson(obj)&&!Array.isArray(obj.questions)){
      counts.notRendered++;counts.skipped.push({path,reason:'结构化 JSON 资源，不作为普通课程讲义；原包保留'});continue;
     }
     raw=plainJson(obj);sourceFormat='markdown';
+    if(Array.isArray(obj.questions)){
+     const questions=[],answers=[];
+     obj.questions.forEach((q,i)=>{
+      const stem=q.stem||q.question||q.question_text||q.text||q.prompt||'';
+      const body=typeof stem==='string'?stem:'';
+      if(!body)return;
+      questions.push('\n\n### Question '+(i+1)+'\n\n'+body);
+      const choices=q.choices||q.options||[];
+      if(Array.isArray(choices))choices.forEach((o,k)=>{
+       const letter=o.letter||String.fromCharCode(65+k);
+       const description=typeof o==='string'?o:(o.text||o.body||o.body_html||'');
+       questions.push(String(letter)+'. '+description);
+      });
+      const ans=q.correct_letter||q.correctAnswer||q.correct_answer||q.answer;
+      if(ans!=null)answers.push('Question '+(i+1)+': '+(typeof ans==='object'?JSON.stringify(ans):String(ans)));
+      const explain=q.explanation||q.solution||q.rationale;
+      if(explain)answers.push(String(explain));
+     });
+     raw+='\n'+questions.join('\n');
+     jsonAnswers=answers.join('\n\n');
+    }
     if(raw.length<35){
       counts.notRendered++;counts.skipped.push({path,reason:'未能可靠提取 JSON 中的课程正文，原包保留'});continue;
     }
+   }else if(/^(md|markdown)$/.test(ext)&&zip.file(base+'.json')){
+    // Companion JSON is not counted as a duplicate lesson but may supply
+    // course/module metadata missing from a flat Markdown archive.
+    const companion=zip.file(base+'.json');
+    if(Number(companion?._data?.uncompressedSize||0)<2000000){
+     try{sourceMeta=JSON.parse(await companion.async('string'));}catch{}
+    }
    }
    if(ext==='docx'||ext==='pdf'){
-    const meta=courseCategory(path);
+    const meta=courseCategory(path,sourceMeta);
     docs.push({id:kind+':'+path,kind,path,title:human(basename(path)),course:meta.course,unit:meta.unit,hierarchy:meta.hierarchy,
       body:'',answers:'',hasAnswer:false,format:ext,hasAssets:false,size,displayMode:'original'});
     counts.documents++;seen.add(base);continue;
@@ -94,10 +136,14 @@ export async function importCompleteCourse(file,kind,progress=()=>{}){
      // HTML is preserved, including tables and original asset references.
      sourceFormat='html';
    }
-   const meta=courseCategory(path);
+   const meta=courseCategory(path,sourceMeta);
    const isHtml=sourceFormat==='html';
    // We only auto-separate explicit answer headings in Markdown / plain text.
-   const segmented=isHtml?{body:raw,answers:'',hasAnswer:false}:splitAnswer(raw);
+   const segmented=isHtml?splitHtmlAnswer(raw):splitAnswer(raw);
+   if(jsonAnswers){
+    segmented.answers=[segmented.answers,jsonAnswers].filter(Boolean).join('\n\n');
+    segmented.hasAnswer=true;
+   }
    docs.push({id:kind+':'+path,kind,path,title:docTitle(raw,path),course:meta.course,unit:meta.unit,hierarchy:meta.hierarchy,
     body:segmented.body,answers:segmented.answers,hasAnswer:segmented.hasAnswer,format:sourceFormat,
     hasAssets:/(!\[[^\]]*\]\([^)]*\)|<img\b)/i.test(raw),size,displayMode:'lesson'});
