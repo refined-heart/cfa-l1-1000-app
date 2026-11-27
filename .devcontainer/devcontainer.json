@@ -1,14 +1,14 @@
 {
-  "name": "Knowledge Studio V3 - CFA, English, Mathematics, Finance",
+  "name": "Knowledge Studio V4 - CFA textbooks and Financial English",
   "image": "mcr.microsoft.com/devcontainers/javascript-node:22",
-  "postCreateCommand": "cd v2 && npm install --no-audit --no-fund && npm run check:v3",
-  "postStartCommand": "bash .devcontainer/start-v3.sh",
+  "postCreateCommand": "cd v2 && npm install --no-audit --no-fund && npm run check:v4",
+  "postStartCommand": "bash .devcontainer/start-v4.sh",
   "forwardPorts": [
     5173
   ],
   "portsAttributes": {
     "5173": {
-      "label": "Knowledge Studio V3 浏览器预览",
+      "label": "V4 - CFA 教程与专业英语课程",
       "onAutoForward": "notify",
       "visibility": "private"
     }
