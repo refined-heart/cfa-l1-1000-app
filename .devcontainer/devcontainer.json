@@ -2,7 +2,7 @@
   "name": "Knowledge Studio V3 - CFA, English, Mathematics, Finance",
   "image": "mcr.microsoft.com/devcontainers/javascript-node:22",
   "postCreateCommand": "cd v2 && npm install --no-audit --no-fund && npm run check:v3",
-  "postStartCommand": "bash .devcontainer/start-v2.sh",
+  "postStartCommand": "bash .devcontainer/start-v3.sh",
   "forwardPorts": [
     5173
   ],
