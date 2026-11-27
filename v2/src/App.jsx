@@ -5,6 +5,9 @@ import {parsePracticeZip,plainText,inspectQuestion,chineseFramework,sourceAnswer
 import {loadBank,saveBank,clearBank,loadState,saveState,makeProfile,blankData,currentData,
  isProblem,isEasy,isWrong,isDue,createProgressUpdate,makeBackup,validateBackup,downloadText,exportCSV,summaryFor} from './lib/persistence';
 import './styles.css';
+import {useWorkspace} from './workspace-context';
+import {ModuleGlossary} from './Dictionary';
+import {exportPracticeZip,downloadBlob,savePracticeFile,parsePracticeOverlay} from './lib/v3-data';
 
 const NAV=[['home','首页'],['practice','分类练习'],['wrong','错题本'],['stats','学习分析'],['settings','账户与设置']];
 const F=['所有题目','未做题','错题','太简单','题目有问题','收藏','最近做对'];
@@ -26,6 +29,8 @@ function SubjectPill({subject}){const s=SUBJECT_INDEX[subject];return <Badge ton
 function NoteCard({subject,module,compact=false}){const n=noteFor(subject,module);return <article className={`note-card ${compact?'compact':''}`}><div className="note-flag">知识体系 · 高观点</div><h3>{n.moduleZh}</h3><p>{n.overview}</p><div className="note-map"><b>知识脉络</b><span>{n.chain}</span></div><div className="note-edge"><b>适用边界</b> {n.boundaries}</div></article>}
 
 export default function App(){
+ const {edits,setChinese,resetChinese,importEdits}=useWorkspace();
+ const [editChineseId,setEditChineseId]=useState(null),[draftChinese,setDraftChinese]=useState('');
  const [bank,setBank]=useState(null),[state,setState]=useState(null),[translations,setTranslations]=useState({});
  const [loading,setLoading]=useState(true),[busy,setBusy]=useState(''),[toast,setToast]=useState('');
  const [route,setRoute]=useState({page:'home'}),[subject,setSubject]=useState('Fixed Income'),[activeModule,setActiveModule]=useState('');
@@ -74,6 +79,15 @@ export default function App(){
   patchData(d=>({...d,flags:{...d.flags,[q.id]:{reason:reason.trim()||'题干/答案存在问题（待复核）',exclude:true,at:new Date().toISOString()}}}));
   setFlagging(null);setReason('');showToast('已标记问题题并从错题本/重复练习移出，可在统计页面查看');}
  function removeFlag(q){patchData(d=>{const f={...d.flags};delete f[q.id];return {...d,flags:f};});showToast('已撤销问题题排除标记')}
+ async function downloadPractice(){
+  try{setBusy('生成包含中文解析与词典修改的 ZIP…');
+   const file=await exportPracticeZip({chinese:edits.chinese,words:edits.words,removedWords:edits.removedWords,
+    moduleWords:edits.moduleWords,hiddenModuleWords:edits.hiddenModuleWords});
+   downloadBlob(file,'practice_V3_Editable_Export.zip');
+   showToast('已导出原题 ZIP + 中文解析/词汇修改层（英文原文未改动）');
+  }catch(err){showToast('导出失败：'+err.message)}
+  finally{setBusy('')}
+ }
  function downloadJSON(){const obj=makeBackup(state,bank);downloadText(`CFA_V2_All_Profiles_${filenameStamp()}.json`,JSON.stringify(obj,null,2));showToast('已导出全部账户的学习记录（不含题库）');}
  function downloadCSV(){if(!bank)return showToast('请先导入题库');downloadText(`CFA_V2_${currentProfile?.name||'profile'}_${filenameStamp()}.csv`,exportCSV(bank,pdata),'text/csv;charset=utf-8');}
  async function importProgress(e){const f=e.target.files?.[0];e.target.value='';if(!f)return;
@@ -85,6 +99,7 @@ export default function App(){
  }
  async function importZip(e){const f=e.target.files?.[0];e.target.value='';if(!f)return;
   try{setBusy('解析 practice.zip…');const b=await parsePracticeZip(f,setBusy);await saveBank(b);setBank(b);
+   await savePracticeFile(f);const overlay=await parsePracticeOverlay(f);if(overlay)importEdits(overlay);
    setBusy('');showToast(`成功导入 ${b.stats.count} 道题，包含 ${b.modules.length} 个模块`);go('home');
   }catch(err){setBusy('');showToast(`导入失败：${err.message}`)}
  }
@@ -140,7 +155,7 @@ export default function App(){
         <div className="topic-intro"><div className="topic-intro-head"><span className="overline">SUBJECT / {sg.short}</span><Badge>{g.modules.length} 小节</Badge></div><h2>{sg.zh}</h2><p>{sg.overview}</p><div className="flow-line"><b>知识脉络</b>{sg.roadmap}</div></div>
         <div className="module-list">{g.modules.map(m=>{const mm=g.questions.filter(q=>q.module===m.title),done=mm.filter(q=>pdata.answers[q.id]?.completed).length,w=mm.filter(q=>isWrong(pdata,q.id)).length,active=activeModule===m.title;return <article className="module-item" key={m.title}>
          <div className="module-top" onClick={()=>setActiveModule(active?'':m.title)}><div className="module-number">{String(m.number||'M').padStart(2,'0')}</div><div className="module-title"><strong>{titleFor(g.id,m.title)}</strong><small>{m.title} · {mm.length} 题</small></div><div className="module-mini"><small>已做 {done} · 错题 {w}</small><Bar n={done} d={mm.length}/></div><span className="caret">{active?'⌃':'⌄'}</span></div>
-         {active&&<div className="module-body"><NoteCard subject={g.id} module={m.title}/><div className="button-row"><button className="btn btn-primary" onClick={()=>start(mm.filter(q=>isDue(pdata,q.id)).map(q=>q.id),titleFor(g.id,m.title),'normal','practice')}>本节全部可练（{mm.filter(q=>isDue(pdata,q.id)).length}）</button><button className="btn btn-outline" onClick={()=>start(mm.filter(q=>isDue(pdata,q.id)&&!pdata.answers[q.id]?.completed).map(q=>q.id),'本节未做题','normal','practice')}>仅未做</button><button className="btn btn-soft" onClick={()=>start(mm.filter(q=>isWrong(pdata,q.id)).map(q=>q.id),'本节错题重做','wrong','wrong')}>本节错题重做（{w}）</button><button className="btn btn-ghost" onClick={()=>start(mm.map(q=>q.id),'本节完整题目（含排除题）','detail','practice')}>查看全部题目</button></div></div>}
+         {active&&<div className="module-body"><NoteCard subject={g.id} module={m.title}/><ModuleGlossary subject={g.id} module={m.title} questions={mm}/><div className="button-row"><button className="btn btn-primary" onClick={()=>start(mm.filter(q=>isDue(pdata,q.id)).map(q=>q.id),titleFor(g.id,m.title),'normal','practice')}>本节全部可练（{mm.filter(q=>isDue(pdata,q.id)).length}）</button><button className="btn btn-outline" onClick={()=>start(mm.filter(q=>isDue(pdata,q.id)&&!pdata.answers[q.id]?.completed).map(q=>q.id),'本节未做题','normal','practice')}>仅未做</button><button className="btn btn-soft" onClick={()=>start(mm.filter(q=>isWrong(pdata,q.id)).map(q=>q.id),'本节错题重做','wrong','wrong')}>本节错题重做（{w}）</button><button className="btn btn-ghost" onClick={()=>start(mm.map(q=>q.id),'本节完整题目（含排除题）','detail','practice')}>查看全部题目</button></div></div>}
         </article>})}</div>
        </>})()}
       </>}
@@ -158,7 +173,13 @@ export default function App(){
          <div className="open-answer"><Badge tone="warning">开放题 / 匹配题</Badge><p>此题原始格式为 {currentQuestion.type}，无法按 A/B/C 自动判分。请先自行作答，再揭示源文件的参考答案。</p><button className="btn btn-outline" onClick={()=>reveal(currentQuestion)}>显示参考答案与中文知识脉络</button></div>}
         {!sessionAnswers[currentQuestion.id]&&<p className="after-hint">完成选择后才展开答案与解析，避免提前泄题。</p>}
         {sessionAnswers[currentQuestion.id]&&<div className="answer-panel"><div className="answer-result"><div><Badge tone={currentQuestion.autoScore?(sessionAnswers[currentQuestion.id]===currentQuestion.answer?'success':'danger'):'info'}>{currentQuestion.autoScore?(sessionAnswers[currentQuestion.id]===currentQuestion.answer?'回答正确':'回答错误'):'已查看参考答案'}</Badge><h3>{currentQuestion.autoScore?`正确答案：${currentQuestion.answer}`:'开放题 · 参考依据'}</h3></div><small>来源：practice.zip</small></div>
-         <div className="answer-columns"><div className="answer-section chinese"><h4>中文解析 · 知识结构版 <Badge tone="warning">非人工逐题校译</Badge></h4><pre>{chineseFramework(currentQuestion)}</pre></div>
+         <div className="answer-columns"><div className="answer-section chinese"><h4>中文解析 · 知识结构版 <Badge tone="warning">非人工逐题校译</Badge></h4><pre>{edits.chinese[currentQuestion.id]?.text||chineseFramework(currentQuestion)}</pre>
+           <div className="v3-inline"><small className="v3-muted">{edits.chinese[currentQuestion.id]?'已保存的个人中文解析':'原理脉络初稿 · 可自主深度校订'}</small>
+            <button onClick={()=>{setEditChineseId(currentQuestion.id);setDraftChinese(edits.chinese[currentQuestion.id]?.text||chineseFramework(currentQuestion))}}>编辑中文解析</button>
+            {edits.chinese[currentQuestion.id]&&<button onClick={()=>{if(window.confirm('清除本题个人中文解析，恢复知识结构初稿？'))resetChinese(currentQuestion.id)}}>恢复初稿</button>}
+           </div>
+           {editChineseId===currentQuestion.id&&<div className="v3-edit-explanation"><p>中文为独立可编辑层；原英文解答完整保留、不会覆盖。</p><textarea rows={13} value={draftChinese} onChange={e=>setDraftChinese(e.target.value)} placeholder="写清楚题目逻辑、为什么选、为什么不选、第一性原理、延伸题型。"/><div className="v3-inline"><button className="v3-primary" onClick={()=>{setChinese(currentQuestion.id,draftChinese);setEditChineseId(null);showToast('本题中文解析已保存')}}>保存这道题的中文解析</button><button onClick={()=>setEditChineseId(null)}>取消</button></div></div>}
+          </div>
          <div className="answer-section high-level"><h4>高观点与题目脉络</h4><p>{inspectQuestion(currentQuestion).overview}</p><div className="logic-chain">{inspectQuestion(currentQuestion).chain}</div><p className="boundary"><b>命题路径：</b>{inspectQuestion(currentQuestion).path}</p></div></div>
          <div className="answer-section translation"><div className="translation-title"><h4>逐题中文译文（可选，本机生成）</h4><button className="btn btn-small btn-outline" disabled={zhBusy} onClick={()=>translate(currentQuestion)}>{zhBusy?'翻译中…':translations[currentQuestion.id]?'已翻译 · 查看':'尝试英译中'}</button></div>
           {translations[currentQuestion.id]?<pre>{translations[currentQuestion.id]}</pre>:<p>若 Chrome 桌面版支持内置翻译，可把原始英文解析翻译成中文并缓存在本机；暂不支持的浏览器保留英文来源和中文知识结构。翻译稿应核查金融术语。</p>}
@@ -191,9 +212,9 @@ export default function App(){
         <div className="profiles">{state.profiles.map(p=>{const d=state.profilesData[p.id]||blankData();return <div className={`profile-row ${p.id===state.activeProfileId?'current':''}`} key={p.id}><div className="avatar">{p.name[0]}</div><div className="profile-main"><strong>{p.name}</strong><small>{Object.keys(d.answers).length} 题已做 · 创建于 {p.createdAt.slice(0,10)}</small></div>{p.id===state.activeProfileId?<Badge tone="success">使用中</Badge>:<button className="btn btn-small btn-soft" onClick={()=>setState(s=>({...s,activeProfileId:p.id}))}>切换</button>}<button className="mini" title="重命名" onClick={()=>renameProfile(p.id)}>✎</button><button className="mini danger" title="删除账户" onClick={()=>deleteProfile(p.id)}>×</button></div>})}</div>
         <div className="create-profile"><input value={profileName} onChange={e=>setProfileName(e.target.value)} placeholder="新账户名称（例如：第二轮复习）" maxLength={50}/><button className="btn btn-primary" disabled={state.profiles.length>=5} onClick={createProfile}>＋ 新建账户</button></div></div>
         <div className="panel"><h2>跨平台学习记录</h2><p>默认导出全部账户，不含题库原文。换浏览器或换电脑后，先导入同一份 <code>practice.zip</code>，再导入记录 JSON，即可恢复进度。</p><div className="stack-buttons"><button className="btn btn-primary" onClick={downloadJSON}><Icon name="download"/> 导出全部账户 · JSON 备份</button><button className="btn btn-outline" onClick={downloadCSV}><Icon name="download"/> 导出当前账户 · CSV 分析</button><button className="btn btn-soft" onClick={()=>importInput.current?.click()}><Icon name="upload"/> 导入学习记录 · JSON</button></div><div className="info-line">跨设备是**手动备份与恢复**，不等于自动云同步。JSON 里的原始题号保持稳定，供以后迁移到 Android V2。</div></div></div>
-       <div className="panel"><h2>题库管理与校勘</h2><p>本题库来自你上传的 <code>practice.zip</code>。保留 10 个科目及模拟考试原始组织方式，支持含表格、案例材料和开放题。</p>
+       <div className="panel"><h2>题库管理、可编辑解析与校勘</h2><p>本题库来自你上传的 <code>practice.zip</code>。保留 10 个科目及模拟考试原始组织方式，支持含表格、案例材料和开放题。</p>
         <div className="bank-meta"><Badge>{bank?`${bank.stats.count} 题`:'未导入'}</Badge><Badge>{bank?`${bank.modules.length} 模块`:'无模块'}</Badge><Badge>{bank?`${bank.stats.autoScored} 可自动判分`:'—'}</Badge><Badge>{bank?`${bank.stats.manual} 开放/不完整题`:'—'}</Badge></div>
-        <div className="button-row"><button className="btn btn-outline" onClick={()=>zipInput.current?.click()}>重新导入 practice.zip</button>{bank&&<button className="btn btn-ghost" onClick={resetBank}>移除本机题库缓存</button>}<button className="btn btn-soft" onClick={()=>{setFilters({subject:'all',module:'all',status:'题目有问题',query:''});go('stats')}}>查看问题题（{bad.length}）</button></div>
+        <div className="button-row"><button className="btn btn-primary" onClick={downloadPractice}>导出题库 ZIP（含中文解析修改）</button><button className="btn btn-outline" onClick={()=>zipInput.current?.click()}>重新导入 practice.zip</button>{bank&&<button className="btn btn-ghost" onClick={resetBank}>移除本机题库缓存</button>}<button className="btn btn-soft" onClick={()=>{setFilters({subject:'all',module:'all',status:'题目有问题',query:''});go('stats')}}>查看问题题（{bad.length}）</button></div>
         <div className="notice">受版权和隐私考虑，V2 在你的浏览器里导入题目，没有将这份上传资料发布到公开 GitHub 仓库。上传的原始英文答案并不等于逐题中文人工校译；需要进一步复核或翻译的题会如实标识。</div>
        </div>
        <div className="panel"><h2>规则与数据安全</h2><p>“题目有问题”会保留标记与学习历史，但立即从错题本及日常重复练习中排除；“太简单”会从重复推荐中排除，仍可从统计或“查看全部题目”进入。多账户记录只在当前浏览器保存，清除站点数据可能导致记录丢失，建议定期导出备份。</p></div>
