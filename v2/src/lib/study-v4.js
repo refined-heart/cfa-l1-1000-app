@@ -57,7 +57,7 @@ function formatRank(p){return /\.(md|markdown)$/i.test(p)?0:/\.html?$/i.test(p)?
 function isBodyJson(o){return o&&typeof o==='object'&&(!Array.isArray(o))&&(['content','body','text','blocks','sections','markdown','html','description','learning_outcomes','learning_objectives'].some(k=>o[k]!==undefined));}
 function splitHtmlAnswer(source){
  const html=String(source||'');
- const pattern=/<h[1-6][^>]*>\s*(?:<[^>]*>)*\s*(?:answers?|solutions?|explanations?|correct answers?|参考答案|答案解析|答案|解析)\b[^<]*<\/h[1-6]>/i;
+ const pattern=/<h[1-6][^>]*>\s*(?:<[^>]*>)*\s*(?:answers?|solutions?|explanations?|correct answers?|参考答案|答案解析|答案|解析)(?:\s|[:：]|(?=<))[^<]*<\/h[1-6]>/i;
  const m=pattern.exec(html);
  if(!m||m.index<html.length*.2)return {body:html,answers:'',hasAnswer:false};
  return {body:html.slice(0,m.index),answers:html.slice(m.index),hasAnswer:true};
