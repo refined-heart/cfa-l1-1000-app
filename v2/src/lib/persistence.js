@@ -84,7 +84,7 @@ export function exportCSV(bank,data){
 }
 export function summaryFor(bank,data){
  const items=bank?.questions||[];
- const results={all:items.length,done:0,correct:0,attempts:0,wrong:0,flagged:0,easy:0,starred:0,minutes:0};
+ const results={all:items.length,done:0,correct:0,scored:0,attempts:0,wrong:0,flagged:0,easy:0,starred:0,minutes:0};
  for(const q of items){
   const r=data.answers[q.id]; if(r){results.done++;results.attempts+=r.attempts||0; if(r.lastCorrect===true) results.correct++; if(r.lastCorrect===true||r.lastCorrect===false) results.scored++; results.minutes+=(r.totalSeconds||0)/60;}
   if(isWrong(data,q.id)) results.wrong++;
