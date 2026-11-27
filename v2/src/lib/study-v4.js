@@ -201,22 +201,49 @@ function extractTexEntries(tex){
  }
  return {words:out,units};
 }
+function extractAlphabeticalIndex(tex){
+ // Read the V5 A/B/C longtable rows directly if no standalone CSV is present.
+ // \textbf{word} [POS + two IPA forms] & 中文释义 & 词元/屈折 \\[1pt]
+ const words={};
+ const table=tex.match(/\\clearpage\\section\{A 基础常用[\s\S]*$/);
+ if(!table)return words;
+ const start=tex.length-table[0].length;
+ const rows=/\\textbf\{([^}]+)\}([\s\S]{0,350}?)\s&\s([^&\n]{1,230})\s&\s([\s\S]{0,300}?)\\\\\[(?:1|2)pt\]/g;
+ const getIpa=(cell,label)=>{
+  const pattern=new RegExp('\\\\ipafont\\s+'+label+'\\\\,\\s*([^}]+)');
+  return (cell.match(pattern)?.[1]||'').replace(/\\allowbreak\{\}/g,'').replace(/[*{}\s]+$/g,'').trim();
+ };
+ const stripTex=s=>String(s||'').replace(/\\(?:allowbreak|textbar)\{?\}?/g,' ').replace(/\\newline/g,'; ').replace(/\\[a-z]+\*?(?:\[[^\]]*\])?/g,'').replace(/[{}]/g,'').replace(/\s+/g,' ').trim();
+ let m;
+ while((m=rows.exec(table[0]))){
+  const word=cleanWord(m[1]);
+  if(!word||word.length>70||/[^a-z\- '\u00e0-\u024f]/i.test(word))continue;
+  const pos=m[2],zh=stripTex(m[3]),shape=stripTex(m[4]);
+  if(!zh||zh.length>200)continue;
+  words[word]={word,zh,en:'',ipaUK:getIpa(pos,'UK'),ipaUS:getIpa(pos,'US'),
+   roots:'',derivation:'',inflections:shape,phrases:'',synonyms:'',antonyms:'',
+   source:'V5 原始三阶 A–Z 索引'};
+ }
+ return words;
+}
+
 export async function inspectV5Book(file,progress=()=>{}){
  const zip=await JSZip.loadAsync(file),files=Object.keys(zip.files).filter(x=>!zip.files[x].dir&&!shouldIgnore(x));
  const pdf=files.filter(n=>/\.pdf$/i.test(n)).sort((a,b)=>/v5/i.test(b)-/v5/i.test(a))[0]||'';
  const tex=files.filter(n=>/\.tex$/i.test(n)).sort((a,b)=>/v5/i.test(b)-/v5/i.test(a))[0]||'';
  const docx=files.filter(n=>/\.docx$/i.test(n)).sort((a,b)=>/v5/i.test(b)-/v5/i.test(a))[0]||'';
  const parsed=await readVocabularyZip(file,progress);
- let texEntries={words:{},units:{}};
+ let texEntries={words:{},units:{}},indexWords={};
  if(tex){
   progress('正在读取 V5 原始词族和章节…');
   const src=await zip.file(tex).async('string');
   texEntries=extractTexEntries(src);
+  indexWords=extractAlphabeticalIndex(src);
  }
- const words={...texEntries.words,...parsed.words};
+ const words={...indexWords,...texEntries.words,...parsed.words};
  const r={fileName:file.name,files:files.length,pdf,tex,docx,
   words,wordCount:Object.keys(words).length,
-  units:texEntries.units,structuredWords:parsed.count,treeWords:Object.keys(texEntries.words).length,
+  units:texEntries.units,structuredWords:parsed.count,treeWords:Object.keys(texEntries.words).length,indexWords:Object.keys(indexWords).length,
   sourceType:pdf?'V5 原版 PDF 教材':docx?'V5 Word 教材':tex?'V5 TeX 原文':'无可视化教材',
   importedAt:new Date().toISOString()};
  zipCache.set('v5',zip);
