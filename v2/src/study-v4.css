@@ -1,0 +1,45 @@
+.sv4-study{max-width:1660px;margin:0 auto;padding:22px clamp(14px,3vw,42px) 80px;color:#1a2a42;font-family:Inter,"Noto Sans SC","Microsoft YaHei",sans-serif}
+.sv4-page-heading{margin-bottom:18px}.sv4-page-heading h1{font-size:clamp(25px,3vw,34px);letter-spacing:-.045em;margin:6px 0}.sv4-page-heading p{font-size:14px;line-height:1.7;color:#65768a;max-width:1100px}
+.sv4-kicker{font-size:11px;letter-spacing:.08em;color:#46739c;font-weight:850;margin-bottom:7px}
+.sv4-panel,.sv4-paper,.sv4-reader{background:#fff;border:1px solid #e0e7ef;border-radius:15px;box-shadow:0 3px 13px rgba(17,40,76,.035);padding:18px;margin-bottom:14px}
+.sv4-action{background:#fff;color:#234866;font-size:12px;line-height:1.3;font-weight:750;border:1px solid #c8d5e2;border-radius:9px;padding:9px 13px;cursor:pointer}
+.sv4-action.primary{background:#204c7f;color:white;border-color:#204c7f}.sv4-action:disabled{opacity:.38}
+.sv4-inline{display:flex;align-items:center;flex-wrap:wrap;gap:10px;margin:10px 0}.sv4-inline input{flex:1;min-width:220px}
+.sv4-inline select{width:auto;max-width:320px;min-width:190px}.sv4-statbar{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:12px}
+.sv4-pill{background:#eef3f8;color:#465c73;font-weight:700;border-radius:999px;padding:6px 10px;font-size:11px}
+.sv4-status{border:1px solid #e7dac0;border-radius:9px;background:#fff8ea;color:#785b25;font-size:12px;line-height:1.7;padding:11px 13px;margin-top:10px;overflow-wrap:anywhere}
+.sv4-empty{border:1px dashed #c9d5e4;background:#f9fbfd;color:#65758b;border-radius:12px;padding:36px;text-align:center;line-height:1.9}
+.sv4-audit{margin-top:12px;background:#f8fafb;border-radius:10px;padding:13px;max-height:220px;overflow:auto}.sv4-audit h3{font-size:14px}.sv4-audit p{font-size:12px;line-height:1.65;margin-bottom:6px;color:#53647a}
+.sv4-course-grid{display:grid;grid-template-columns:minmax(270px,330px) minmax(0,1fr);gap:15px;align-items:start}
+.sv4-course-nav{background:#fff;border:1px solid #e0e8ef;border-radius:13px;padding:12px;position:sticky;top:110px;max-height:calc(100vh - 130px);overflow:auto}
+.sv4-nav-panel{border-bottom:1px solid #e7eef4;padding:8px 2px 13px;margin-bottom:10px}.sv4-nav-panel>b{font-size:12px;display:block;color:#526b87;margin-bottom:9px}.sv4-nav-panel select,.sv4-nav-panel input{width:100%}
+.sv4-unit-list,.sv4-lesson-list{display:grid;gap:3px;max-height:260px;overflow:auto}
+.sv4-course-nav button,.sv4-unit-study aside button{display:block;width:100%;text-align:left;background:transparent;color:#31445d;border:none;border-radius:8px;padding:10px;font-size:12px;line-height:1.5}
+.sv4-course-nav button.on,.sv4-course-nav button:hover,.sv4-unit-study aside button.on,.sv4-unit-study aside button:hover{background:#eaf2fc;color:#1c528a}
+.sv4-course-nav button small{display:block;color:#91a0af;font-size:10px;margin-top:3px}
+.sv4-reader{padding:0;overflow:hidden}.sv4-reader-top{padding:19px 20px;display:flex;gap:12px;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;border-bottom:1px solid #e9eef5}
+.sv4-reader-top h2{font-size:22px;line-height:1.38;margin:0 0 7px}.sv4-reader-top small{color:#91a0ae;font-size:10px;overflow-wrap:anywhere}
+.sv4-reader-controls{display:flex;gap:5px;flex-wrap:wrap}.sv4-tabs{display:flex;gap:4px;border-bottom:1px solid #e0e7ee;padding:8px 15px;flex-wrap:wrap;background:#fafcfe}
+.sv4-tabs button{border:none;border-radius:8px;background:transparent;padding:10px 13px;font-size:13px;font-weight:750;color:#687e96}.sv4-tabs button.on{background:#eaf2fc;color:#164b86}
+.sv4-reader .sv4-paper{border:none;box-shadow:none;margin:0;padding:23px 25px}
+.sv4-paper h3{font-size:18px}.sv4-paper>p{font-size:13px;color:#6c7c8e}
+.sv4-article{font-size:15px;line-height:1.9;overflow-wrap:anywhere;overflow-x:auto}.sv4-article h1,.sv4-article h2,.sv4-article h3{margin:26px 0 14px}.sv4-article p{line-height:1.9;color:#24354b}
+.sv4-article img{max-width:100%;height:auto}.sv4-article pre{overflow:auto;background:#f4f6f9;padding:12px;border-radius:9px}
+.sv4-article table{border-collapse:collapse;display:block;max-width:100%;overflow-x:auto}.sv4-article th,.sv4-article td{border:1px solid #d7e2ef;padding:8px}
+.sv4-pdf{width:100%;height:min(82vh,950px);min-height:560px;border:1px solid #e5ebf1;border-radius:9px}
+.sv4-english-pdf{height:83vh}
+.sv4-source-note{font-size:12px!important;color:#7a8a9d!important;margin-top:18px;border-top:1px solid #edf1f4;padding-top:12px}
+.sv4-paper textarea{width:100%;line-height:1.75}
+.sv4-exam-item{border:1px solid #e5ebf1;border-radius:10px;padding:16px;margin:10px 0 18px}
+.sv4-exam-item b{display:block;line-height:1.7;font-size:14px;margin-bottom:12px}
+.sv4-exam-item label{display:flex;gap:10px;align-items:center;border:1px solid #e7edf5;border-radius:8px;padding:9px 12px;margin-bottom:7px;font-size:13px}
+.sv4-exam-item input{min-width:0;height:auto}.sv4-exam-item label strong{font-weight:800}
+.sv4-exam-response{margin:11px 0;color:#256a51;font-size:13px;font-weight:750}
+.sv4-unit-study{display:grid;grid-template-columns:minmax(220px,280px) minmax(0,1fr);gap:15px}
+.sv4-unit-study aside{max-height:85vh;overflow-y:auto;position:sticky;top:110px;background:white;border:1px solid #dde8ef;border-radius:13px;padding:12px}
+.sv4-unit-study aside h3{font-size:15px;margin:6px 7px 9px}
+.sv4-wordcards{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:10px;margin:16px 0}
+.sv4-wordcards button{background:#f9fbff;border:1px solid #dae5f2;border-radius:10px;padding:12px;text-align:left;display:grid;gap:5px;min-width:0}
+.sv4-wordcards button b{color:#224b7b;font-size:15px}.sv4-wordcards button span,.sv4-wordcards button small{font-size:11px;color:#65758b;overflow-wrap:anywhere;line-height:1.6}
+@media(max-width:950px){.sv4-course-grid,.sv4-unit-study{grid-template-columns:1fr}.sv4-course-nav,.sv4-unit-study aside{position:static;max-height:400px}.sv4-unit-study aside{display:flex;flex-wrap:wrap;gap:4px}.sv4-unit-study aside button{width:auto}.sv4-unit-study aside h3{width:100%}}
+@media(max-width:590px){.sv4-study{padding:12px 10px 86px}.sv4-panel,.sv4-paper{padding:12px}.sv4-reader-top{padding:14px}.sv4-reader .sv4-paper{padding:14px}.sv4-tabs button{padding:8px;font-size:12px}.sv4-pdf{min-height:450px}.sv4-wordcards{grid-template-columns:repeat(2,minmax(0,1fr))}}
