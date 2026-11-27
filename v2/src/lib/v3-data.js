@@ -115,14 +115,23 @@ function textOfJson(obj){
  return '';
 }
 export function splitAnswer(source){
- const lines=String(source||'').split(/\r?\n/),head=/^\s*#{1,6}\s*(?:answer|solutions?|explanations?|correct answer|参考答案|答案解析|答案|解答|解析)(?:\s|[:：]|$)/i;
- let firstAt=lines.findIndex(l=>head.test(l));
- if(firstAt<0){
-  const inline=/^\s*(?:correct\s+answer|answer\s+key|参考答案|正确答案)\s*[:：]/i;
-  firstAt=lines.findIndex(l=>inline.test(l));
+ const lines=String(source||'').split(/\r?\n/);
+ const answerTitle=/^(?:answer|solutions?|explanations?|correct answer|参考答案|答案解析|答案|解答|解析)(?:\s|[:：]|$)/i;
+ const inline=/^\s*(?:(?:\*\*)?\s*(?:correct\s+answer|answer\s+key|参考答案|正确答案|答案解析)\s*[:：])/i;
+ const body=[],answers=[];
+ let inAnswer=false,answerLevel=Infinity;
+ for(const line of lines){
+  const h=line.match(/^\s*(#{1,6})\s+(.+)$/),level=h?h[1].length:Infinity;
+  if(h){
+   if(inAnswer&&level<=answerLevel){inAnswer=false;answerLevel=Infinity;}
+   if(answerTitle.test(h[2].replace(/\*\*/g,'').trim())){
+    inAnswer=true;answerLevel=level;
+   }
+  }
+  if(!inAnswer&&inline.test(line)){answers.push(line);continue;}
+  if(inAnswer)answers.push(line);else body.push(line);
  }
- if(firstAt<0)return {body:source,answers:'',hasAnswer:false};
- return {body:lines.slice(0,firstAt).join('\n'),answers:lines.slice(firstAt).join('\n'),hasAnswer:true};
+ return {body:body.join('\n'),answers:answers.join('\n'),hasAnswer:answers.length>0};
 }
 function titleSort(a,b){return a.path.localeCompare(b.path,undefined,{numeric:true,sensitivity:'base'});}
 export async function readCourseZip(file,kind='source',onProgress=()=>{}){
