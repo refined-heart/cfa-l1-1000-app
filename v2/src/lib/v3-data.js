@@ -14,14 +14,14 @@ const first=(o,keys)=>{for(const k of keys){const v=o?.[k];if(typeof v==='string
 function arrayText(v){return Array.isArray(v)?v.map(x=>typeof x==='string'?x:first(x,['word','text','name','value'])).filter(Boolean).join('; '):typeof v==='string'?v:'';}
 export function normalizeWord(raw){
  if(typeof raw==='string')return {word:cleanWord(raw),zh:'',en:'',ipaUK:'',ipaUS:'',roots:'',derivation:'',inflections:'',phrases:'',synonyms:'',antonyms:'',source:'手动'};
- const word=cleanWord(first(raw,['word','lemma','term','headword','vocabulary','entry','token','英文','单词','英文单词','english_word']));
+ const word=cleanWord(first(raw,['word','lemma','term','headword','vocabulary','entry','token','english_word','englishWord','Word','英文','单词','英文单词']));
  if(!word||word.length>65||!/[a-z]/.test(word))return null;
  return {
   word,
-  zh:first(raw,['zh','chinese','chineseMeaning','meaning_zh','definition_zh','translation','cn','中文','中文释义','释义','meaning_cn']),
-  en:first(raw,['en','english','englishMeaning','definition_en','definition','meaning','gloss','英文释义','英文解释']),
-  ipaUK:first(raw,['ipaUK','uk_ipa','ipa_uk','phonetic_uk','britishIPA','uk','英音']),
-  ipaUS:first(raw,['ipaUS','us_ipa','ipa_us','phonetic_us','americanIPA','us','美音']),
+  zh:first(raw,['zh','chinese','chineseMeaning','meaning_zh','definition_zh','translation','cn','中文','中文释义','释义','meaning_cn','中文解释','chinese_definition','translation_zh','chinese_definition_short']),
+  en:first(raw,['en','english','englishMeaning','definition_en','definition','meaning','gloss','英文释义','英文解释','english_definition','definitionEnglish','english_definition_short']),
+  ipaUK:first(raw,['ipaUK','uk_ipa','ipa_uk','phonetic_uk','britishIPA','british_ipa','ipaBrE','uk','英音']),
+  ipaUS:first(raw,['ipaUS','us_ipa','ipa_us','phonetic_us','americanIPA','american_ipa','ipaAmE','us','美音']),
   roots:arrayText(raw.roots||raw.etymology||raw.morphemes||raw.affixes||raw.词根词缀),
   derivation:arrayText(raw.derivation||raw.derivatives||raw.word_family||raw.派生),
   inflections:arrayText(raw.inflections||raw.forms||raw.屈折),
@@ -57,9 +57,27 @@ function flattenWordRows(v,depth=0){
  }
  return out;
 }
+function parseMarkdownVocabulary(source){
+ const lines=String(source).split(/\r?\n/),out=[];
+ let header=null;
+ for(const line of lines){
+  if(!line.trim().startsWith('|')){header=null;continue}
+  const cols=line.split('|').slice(1,-1).map(x=>x.trim());
+  if(cols.some(x=>!x))continue;
+  if(!header){
+   if(cols.some(x=>/^(word|english|lemma|term|单词|英文|词条)$/i.test(x)))header=cols;
+   continue;
+  }
+  if(cols.every(x=>/^[-:\s]+$/.test(x)))continue;
+  const row=Object.fromEntries(header.map((k,i)=>[k,cols[i]||'']));
+  if(row.word||row.英文||row.单词||row.lemma||row.english)out.push(row);
+ }
+ return out;
+}
+
 export async function readVocabularyZip(file,onProgress=()=>{}){
  const zip=await JSZip.loadAsync(file);
- const names=Object.keys(zip.files).filter(n=>!zip.files[n].dir&&/\.(json|csv|tsv)$/i.test(n)&&!n.includes('node_modules/')&&!n.startsWith('__MACOSX/'));
+ const names=Object.keys(zip.files).filter(n=>!zip.files[n].dir&&/\.(json|jsonl|csv|tsv|md|markdown)$/i.test(n)&&!n.includes('node_modules/')&&!n.startsWith('__MACOSX/'));
  const words=new Map(),details=[];let accepted=0;
  for(let i=0;i<names.length;i++){
   const name=names[i],entry=zip.file(name);if(!entry||entry._data?.uncompressedSize>18000000)continue;
@@ -67,7 +85,8 @@ export async function readVocabularyZip(file,onProgress=()=>{}){
   try{
    const text=await entry.async('string');
    const rows=name.toLowerCase().endsWith('.json')?flattenWordRows(JSON.parse(text)):
-    parseDelimited(text,name.toLowerCase().endsWith('.tsv')?'\t':',');
+    name.toLowerCase().endsWith('.jsonl')?text.split(/\r?\n/).filter(Boolean).flatMap(x=>{try{return flattenWordRows(JSON.parse(x))}catch{return []}}):
+    /\.md|\.markdown$/i.test(name)?parseMarkdownVocabulary(text):parseDelimited(text,name.toLowerCase().endsWith('.tsv')?'\t':',');
    let added=0;
    for(const raw of rows){const w=normalizeWord(raw);if(!w)continue;
     const old=words.get(w.word);
