@@ -12,7 +12,7 @@ const AREAS=['现代数学','专业英语','金融学','CFA'];
 const CFA=['CFA1 教程','CFA1 Practice','CFA2 教程','CFA2 Practice','CFA3 教程','CFA3 Practice'];
 function WorkspaceShell(){
  const {ready,edits,course,notice,setNotice,importEdits}=useWorkspace();
- const [area,setArea]=useState('CFA'),[module,setModule]=useState('CFA1 Practice');
+ const [area,setArea]=useState('CFA'),[module,setModule]=useState('CFA1 教程');
  const [word,setWord]=useState(''),[dataOpen,setDataOpen]=useState(false),[dataBusy,setDataBusy]=useState('');
  const backupInput=useRef(null);
  async function exportData(){
