@@ -1,20 +1,25 @@
 {
-  "name": "cfa-v2-web-preview",
-  "version": "2.0.0",
+  "name": "cfa-v3-knowledge-studio",
+  "version": "3.0.0",
   "private": true,
   "type": "module",
   "scripts": {
     "dev": "vite --host 0.0.0.0 --port 5173 --strictPort",
     "build": "vite build",
     "preview": "vite preview --host 0.0.0.0 --port 4173",
-    "test:logic": "node scripts/test-logic.mjs"
+    "test:logic": "node scripts/test-logic.mjs",
+    "test:v3": "node scripts/test-v3.mjs",
+    "check:v3": "npm run test:logic && npm run test:v3 && npm run build"
   },
   "dependencies": {
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "jszip": "^3.10.1",
     "idb-keyval": "^6.2.2",
-    "dompurify": "^3.2.6"
+    "dompurify": "^3.2.6",
+    "marked": "^15.0.12"
   },
-  "devDependencies": {"vite": "^7.1.1"}
+  "devDependencies": {
+    "vite": "^7.1.1"
+  }
 }
