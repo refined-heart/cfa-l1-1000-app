@@ -44,7 +44,9 @@ const v=await archive('V5.zip',zip=>{
   '\\treeword{yield}{n.}{语料词}{收益率}\n' +
   '{\\color{muted}\\ipapair{/jiːld/}{/jiːld/}{}\\par}\n' +
   '\\leaf{n. yield / yields}\n' +
-  '\\treeword{coupon}{n.}{语料词}{票息}\n');
+  '\\treeword{coupon}{n.}{语料词}{票息}\n' +
+  '\\clearpage\\section{A 基础常用：A--Z 索引}\n' +
+  '\\textbf{asset}\\newline {\\scriptsize n.} & 资产 & {\\small 词元：asset}\\\\[1pt]\n');
  zip.file('V5/Financial_English_V5.pdf',new Uint8Array([37,80,68,70]));
 });
 const book=await inspectV5Book(v,()=>{});
