@@ -3,7 +3,7 @@ import DOMPurify from 'dompurify';
 import {SUBJECTS,SUBJECT_INDEX,noteFor,titleFor} from './lib/curriculum';
 import {parsePracticeZip,plainText,inspectQuestion,chineseFramework,sourceAnswerText} from './lib/practice';
 import {loadBank,saveBank,clearBank,loadState,saveState,makeProfile,blankData,currentData,
- isProblem,isEasy,isWrong,isDue,createProgressUpdate,makeBackup,validateBackup,downloadText,exportCSV,summaryFor} from './lib/persistence';
+ isProblem,isEasy,isWrong,isDue,createProgressUpdate,makeBackup,validateBackup,downloadText,exportCSV,summaryFor,initialState} from './lib/persistence';
 import './styles.css';
 import {useWorkspace} from './workspace-context';
 import {ModuleGlossary} from './Dictionary';
