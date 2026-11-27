@@ -10,6 +10,7 @@ import {WordPopup,SEED} from './Dictionary';
 import {downloadBlob,cleanWord} from './lib/v3-data';
 import {
  importCompleteCourse,materializeCourseMedia,openOriginalCourseEntry,downloadOriginalCourse,
+ attachCourseAssetArchive,discardCourseRaw,
  inspectV5Book,loadV5Book,loadV5PdfBlob,V5_UNITS
 } from './lib/study-v4';
 import {OtherArea,EmptyCFAModule} from './StudyAreas';
@@ -139,7 +140,7 @@ export function TutorialArea(){
  const {course,applyCourse,edits,patch}=useWorkspace();
  const [source,setSource]=useState('delivery'),[courseName,setCourseName]=useState(''),[unitName,setUnitName]=useState(''),[query,setQuery]=useState(''),[chosen,setChosen]=useState('');
  const [busy,setBusy]=useState(''),[audit,setAudit]=useState(false);
- const file=useRef(null);
+ const file=useRef(null),assetFile=useRef(null);
  const docs=useMemo(()=>course.docs.filter(d=>d.kind===source),[course,source]);
  const groups=useMemo(()=>byGroup(docs,lessonGroup),[docs]);
  const categories=Object.keys(groups).sort(natural);
@@ -153,9 +154,25 @@ export function TutorialArea(){
  const allDone=docs.filter(d=>edits.lessonChecks[d.id]).length;
  async function importZip(e){const f=e.target.files?.[0];e.target.value='';if(!f)return;
   try{setBusy('正在分析原始课程文件结构…');const part=await importCompleteCourse(f,source,setBusy);
-   await applyCourse(part);setCourseName('');setUnitName('');setChosen('');setQuery('');setBusy('已导入 '+part.docs.length+' 篇讲义；原附件 '+part.summary.media+' 个，未渲染 '+part.summary.notRendered+' 项。');
+   try{await applyCourse(part);}
+   catch(storageError){
+    // Prioritize usable lesson text over caching a 236-MB original ZIP.
+    await discardCourseRaw(source);
+    part.summary.originalArchiveSaved=false;
+    part.summary.storageWarning='浏览器存储额度不足：课程目录已保存，但原始大 ZIP 未缓存，请保留本机原文件。';
+    await applyCourse(part);
+   }
+   setCourseName('');setUnitName('');setChosen('');setQuery('');
+   setBusy('已生成 '+part.docs.length+' 篇讲义，附图/媒体 '+part.summary.media+' 项，未渲染 '+part.summary.notRendered+' 项。');
    setAudit(true);
   }catch(err){setBusy('导入失败：'+err.message);}
+ }
+ async function attachAssets(e){
+  const f=e.target.files?.[0];e.target.value='';if(!f)return;
+  try{setBusy('正在读取图片/图表附件…');
+   const result=await attachCourseAssetArchive(f,source);
+   setBusy('已匹配 '+result.images+' 个图片资源。'+(result.warning||'切换课次可重新载入附件。'));
+  }catch(e){setBusy('图片附件导入失败：'+e.message);}
  }
  async function exportZip(){try{const blob=await downloadOriginalCourse(source);downloadBlob(blob,source+'_Original_Course.zip')}catch(e){setBusy(e.message)}}
  function exportRecord(){
@@ -169,7 +186,7 @@ export function TutorialArea(){
   <div className="sv4-page-heading"><Kicker>CFA LEVEL I · 原始课程体系</Kicker><h1>CFA1 教程 · 课程化学习</h1><p>以你提供的两份原始课程 ZIP 为准：按课程、章节、课次组织讲义；练习答案不会作为题干提示。保留原附件与来源路径。</p></div>
   <div className="sv4-panel sv4-import-bar">
    <div className="sv4-inline"><strong>课程来源</strong><select value={source} onChange={e=>changeSource(e.target.value)}><option value="delivery">Course_Content_交付版</option><option value="source">Course_Content 原始版</option></select>
-    <input type="file" accept=".zip" hidden ref={file} onChange={importZip}/><Action solid onClick={()=>file.current?.click()}>导入课程 ZIP</Action>
+    <input type="file" accept=".zip" hidden ref={file} onChange={importZip}/><Action solid onClick={()=>file.current?.click()}>导入课程 ZIP</Action><input type="file" accept=".zip" hidden ref={assetFile} onChange={attachAssets}/><Action onClick={()=>assetFile.current?.click()}>补充导入图片 ZIP</Action>
     <Action onClick={exportZip} disabled={!sourceData}>导出原始 ZIP</Action><Action onClick={exportRecord} disabled={!docs.length}>导出学习笔记</Action></div>
    <div className="sv4-statbar"><Pill>{docs.length} 篇讲义</Pill><Pill>{categories.length} 门课程</Pill><Pill>已学 {allDone} 篇</Pill>
     <Pill>原附件 {sourceData?.media??'—'}</Pill><Pill>暂未渲染 {sourceData?.notRendered??'—'}</Pill>
